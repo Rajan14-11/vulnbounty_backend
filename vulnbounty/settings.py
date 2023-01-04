@@ -40,9 +40,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-lpq$)_!^c5)*$kfu#3p@=s7@kj=v_g11v=rc3r1)xhgmkx&!hq'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost','sarathejohn.pythonanywhere.com']
 
 
 # Application definition
@@ -140,6 +140,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT=os.path.join(BASE_DIR,'static')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.0/ref/settings/#default-auto-field
