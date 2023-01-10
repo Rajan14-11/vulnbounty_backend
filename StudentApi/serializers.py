@@ -3,6 +3,12 @@ from StudentApi.models import *
 from django.contrib.auth.models import User
 import re
 
+class StudentRegisterSdrializer(serializers.ModelSerializer):
+    confirm_password=serializers.CharField()
+    terms_and_policy=serializers.BooleanField(required=True)
+    class Meta:
+        model = User
+        fields=['first_name','last_name','email','username','email','password','confirm_password']
 
 class UserSerializer(serializers.Serializer):
     class Meta:

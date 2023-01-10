@@ -12,3 +12,7 @@ class LoginSerializer(serializers.ModelSerializer):
     class Meta:
         model=User
         fields=['username','password']
+
+class ValidatePhoneSerializer(serializers.Serializer):
+    country_code=serializers.CharField()
+    phone_number=serializers.IntegerField()

@@ -23,4 +23,5 @@ def send_email_verification_mail(email,token):
         send_mail(subject , message, email_from , recipient_list)
         return True
     except Exception as e:
+        
         return False

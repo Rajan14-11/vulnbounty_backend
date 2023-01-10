@@ -5,13 +5,32 @@ from ProfessionalApi.models import professional
 from StudentApi.models import Student
 from MainApi.models import ExtendUser,ValidateNumber
 import re
+import requests
+import json
+from django.conf import settings
+# from rest_framework_recaptcha import ReCaptchaField
+
+
+
+# class MyReCaptchaField(ReCaptchaField):
+#     default_error_messages = {
+#         "invalid-input-response": "reCAPTCHA token is invalid.",
+#     }
+
 
 class CompanyRegisterSerializer(serializers.ModelSerializer):
     confirm_password=serializers.CharField()
     terms_and_policy=serializers.BooleanField(required=True)
+    email=serializers.EmailField(required=True)
+    # recaptcha = serializers.CharField(required=True)
     class Meta:
         model = User
-        fields=['first_name','last_name','email','username','email','password','confirm_password']
+        fields=['first_name','last_name','username','email','password','confirm_password','terms_and_policy']
+        extra_kwargs = {
+            'first_name': {'required': True},
+            'last_name': {'required': True},
+            'password':{'write_only':True},
+        }
 
      
     def validate(self, data):
@@ -20,20 +39,17 @@ class CompanyRegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Please enter a password and "
                 "confirm it.")
         if data.get('password') != data.get('confirm_password'):
-            raise serializers.ValidationError("Those passwords don't match.")
+            raise serializers.ValidationError("password and confirm pasword didn't match")
         return data
 
-    def validate_email(self,data):
-        email=data.get("email")
-        if not email :
-            raise serializers.ValidationError("Please enter email")
+    def validate_email(self,email):
+        # email=data["email"]
+        if User.objects.filter(email=email).exists() or ExtendUser.objects.filter(optional_email=email).exists():
+            raise serializers.ValidationError(" Email is already registered, please select another.")
         else:
-            if User.objects.filter(email=email).exists() or ExtendUser.objects.filter(optional_email=email).exists():
-                raise serializers.ValidationError(" Email is already registered, please select another.")
-            else:
-                return email
-    def validate_username(self,data):
-        username=data.get("username")
+            return email
+    def validate_username(self,username):
+        # username=data["username"]
         regex = "^([a-z]+('[a-z])?[0-9a-z]*)$"
         if not username:
             raise serializers.ValidationError("This field is required.")
@@ -44,6 +60,35 @@ class CompanyRegisterSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError("Allowed are alphabet,number and apostrophe") 
             else:
                 return username
+    # def validate_recaptcha(self,recaptcha):
+    #     secret_key=settings.RECAPTCHA_SECRET_KEY
+    #     captcha_data={
+    #             "secret":secret_key,
+    #             "response":recaptcha
+    #         }
+    #     response_data=requests.post('https://www.google.com/recaptcha/api/siteverify',captcha_data)
+    #     response=json.loads(response_data.text)
+    #     verify=response['success']
+    #     print(verify)
+    #     if verify == True:
+    #         return recaptcha
+    #     else:
+    #         raise serializers.ValidationError("reCAPTCHA not verifyied") 
+
+
+    def create(self, validated_data):
+        user = User.objects.create(
+            username=validated_data['username'],
+            email=validated_data['email'],
+            first_name=validated_data['first_name'],
+            last_name=validated_data['last_name']
+        )
+
+        
+        user.set_password(validated_data['password'])
+        user.save()
+
+        return user
          
 class CompanyProgramSerializer(serializers.ModelSerializer):
     class Meta:
@@ -65,9 +110,19 @@ class CompanyStudentLeaderBoardSerializer(serializers.ModelSerializer):
         model=Student
         fields="__all__"
 class ComapnyImageUploadSerializer(serializers.ModelSerializer):
+    profile_picture=serializers.ImageField(required=True)
     class Meta:
         model=company
         fields=["profile_picture"]
+        extra_kwargs = {
+            'profile_picture': {'required': True},
+        }
+    def validate(self,data):
+        if not data.get('profile_picture') :
+            raise serializers.ValidationError({"profile_picture":"This field is required."})
+        else:
+            return data
+
 
 class CompanySettingsSerializer(serializers.ModelSerializer):
     class Meta:
@@ -89,7 +144,7 @@ class CompanyCreateProgramSerializer(serializers.Serializer):
     slug=serializers.SlugField(required=True)
     title=serializers.CharField(required=True)
     introduction=serializers.CharField(required=True)
-    vulnerability=serializers.CharField(required=True)
+    vulnerability_concerns=serializers.CharField(required=True)
     target=serializers.URLField()
     out_target=serializers.URLField()
     scope_type=serializers.ChoiceField(

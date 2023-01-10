@@ -11,7 +11,7 @@ from StudentApi.models import Student
 from ProfessionalApi.models import professional
 import re
 from twilio.rest import Client
-from .helpers import send_email_verification_mail
+from .helpers import send_email_verification_mail,send_optional_email_verification_mail
 import uuid
 import stripe
 from django.conf import settings
@@ -21,61 +21,50 @@ from MainApi.models import ExtendUser,ValidateNumber,messages
 from django.contrib.auth.hashers import make_password
 import requests
 import json
+from rest_framework import status
+from .renderers import UserRender
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.permissions import IsAuthenticated
+from .decorators import allowed_users
+# Geneerate Token Manually
+def get_tokens_for_user(user):
+    refresh = RefreshToken.for_user(user)
 
-user_id=3
-user=User.objects.get(id=user_id)
+    return {
+        'refresh': str(refresh),
+        'access': str(refresh.access_token),
+    }
 
 class CompanyRegisterAPIView(APIView):
-    def post(self,request):
+    renderer_classes=[UserRender]
+    def post(self,request,format=None):
         serializer=CompanyRegisterSerializer(data=request.data)
-        print(request.data)
-        client_key=request.data('g-recaptcha-response')
-        secret_key=settings.RECAPTCHA_SECRET_KEY
-        captcha_data={
-                "secret":secret_key,
-                "response":client_key
-            }
-        response_data=requests.post('https://www.google.com/recaptcha/api/siteverify',captcha_data)
-        response=json.loads(response_data.text)
-        verify=response['success']
-        print(f'verify is = {verify}')
-        if verify == True:
-            terms_and_policy=request.data('terms_and_policy')
-            if not terms_and_policy == 'checked':
-                message="please tick the privacy policy and terms"
+        if serializer.is_valid(raise_exception=True):
+            email_token = str(uuid.uuid4())
+            user=serializer.save()
+            company_obj = company.objects.create(company_user=user,email_verification_token=email_token,terms_and_policy=True)
+            token=get_tokens_for_user(user)
+            if company_obj:
+                company_wallet.objects.create(company=company_obj)
+                send_email_verification_mail(request,user.email,email_token )
+                message='Account created Successfully ! verify your email'
             else:
-                if serializer.is_valid(raise_exception=True):
-                    password=serializer.cleaned_data.get('password')
-                    confirm_password=serializer.cleaned_data.get('confirm_password')
-                    if password != confirm_password:
-                        message="password and confirm pasword didn't match"
-                        return Response({"message":message})
-                    token = str(uuid.uuid4())
-                    user=serializer.save(commit=False)
-                    user.password=make_password(request.POST['password'])
-                    user.username=serializer.cleaned_data['username']
-                    user.email_verification_token=  token
-                    user.save()
-                    company_obj = company.objects.create(company_user=user,email_verification_token= token,terms_and_policy=True)
-                    if company_obj:
-                        company_wallet.objects.create(company=company_obj)
-                        send_email_verification_mail(request,user.email,token)
-                        messsage='Account created Successfully ! verify your email'
-                    else:
-                        message='Account not created retry again'
-                    return Response({"path":"ifreached"})
-                    
-                else:
-                    print("elsereached")
-                    return Response({"path":"elsereached"})
+                message='Account not created retry again'
+            return Response({"token":token,"message":message})
+            
         else:
-            message="reCAPTCHA not verifyied"
-        return Response({"message":messsage})             
+            print("elsereached")
+            return Response({"message":"Try again later"})  
+         
 class CompanyDashboardAPIView(APIView):
+    
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
+    # @allowed_users()
     def get(self,request):
         print(request.user.id)
         try:
-            company_obj=company.objects.get(company_user=user_id)
+            company_obj=company.objects.get(company_user=request.user.id)
             submission_today=submission.objects.filter(program__company=request.user.id,created_at__date=date.today()).count()
             submission_this_month=submission.objects.filter(program__company=request.user.id,created_at__month=date.today().month).count()
             top_hunter=professional.objects.filter(reward__gte=1).order_by("-reward")[:5]
@@ -98,12 +87,15 @@ class CompanyDashboardAPIView(APIView):
         except Exception as e:
             message="failed"
             response={
-                "message":message
+                "message":message,
+                "data":None
             }
             return Response(response)      
 class CompanyProgramAPIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
     def get(self,request):
-        user=User.objects.get(id=user_id) 
+        user=User.objects.get(id=request.user.id) 
         program_obj=companyProgram.objects.filter(company=user)
         response={
             "message":"success",
@@ -134,7 +126,7 @@ class CompanyProgramAPIView(APIView):
                 slug=request.data['slug']
                 title=request.data['title']
                 introduction=request.data['introduction']
-                vulnerability_concerns= request.data['vulnerability']
+                vulnerability_concerns= request.data['vulnerability_concerns']
                 target=request.data['target']
                 scope_type=request.data['scope_type']
                 out_scope_target=request.data['out_target']
@@ -191,8 +183,8 @@ class CompanyProgramAPIView(APIView):
                             region=request.data['region']
                         else:
                             region='all'
-                        print(user.id)
-                        program.company_id=user
+                        print(request.user)
+                        program.company=request.user
                         program.in_scope=in_scope.save()
                         program.out_scope=out_scope.save()
                         program.rewards=reward.save()
@@ -211,35 +203,18 @@ class CompanyProgramAPIView(APIView):
             message.error(request,"reCAPTCHA not verifyied")
             
             # print(title,slug,introduction,vulnerability_concerns,target,scope_type,out_scope_target,visibility,p1_min,p1_max,p2_min,p2_max,p3_min,p3_max,p4_min,p4_max,p5_min,p5_max)
-
-            
-            
-                
-           
-                
-            
-
-
-            
-                
-            
-
-           
-        
-    
-        context={
-        "in_scope":in_scope,
-        "out_scope":out_scope,
-        "program":program,
-        "reward":reward,
-        "values":values
+        response={
+            "message":message,
+            "data":None
         }
-        return render(request,"Company/program/index.html",context)
+        return Response(response)
 
  
 class CompanyProgramDetailsAPIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
     def get(self,request,pk):
-        user=User.objects.get(id=user_id) 
+        user=User.objects.get(id=request.user.id) 
         if companyProgram.objects.filter(company=user).exists():
             program_obj=companyProgram.objects.get(company=user,id=pk)
             program_serializer=CompanyProgramSerializer(program_obj)
@@ -257,10 +232,12 @@ class CompanyProgramDetailsAPIView(APIView):
         return Response(response)
 
 class CompanyDeleteProgramAPIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
     def get(self,request,pk):
         print(pk)
         try:
-            companyProgram.objects.get(company=user,id=pk).delete()
+            companyProgram.objects.get(company=request.user,id=pk).delete()
             response={
                 "message":"Deleted Successfully"
             }
@@ -268,19 +245,20 @@ class CompanyDeleteProgramAPIView(APIView):
         except  Exception as e: 
             print(e)
             response={
-                "message":"Program Already Deleted"
+                "message":"Program Not found"
             }
              
         return Response(response)
 
 class CompanySubmissionAPIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
     def get(self,request):
-        print(user)
-        all_submission=submission.objects.filter(program_id__company=user.id)
-        pending_submission=submission.objects.filter(program_id__company=user,status='pending')
-        accepted_submission=submission.objects.filter(program_id__company=user,status='accepted')
-        rejected_submission=submission.objects.filter(program_id__company=user,status='rejected')
-        completed_submission=submission.objects.filter(program_id__company=user,status='completed')
+        all_submission=submission.objects.filter(program_id__company=request.user)
+        pending_submission=submission.objects.filter(program_id__company=request.user,status='pending')
+        accepted_submission=submission.objects.filter(program_id__company=request.user,status='accepted')
+        rejected_submission=submission.objects.filter(program_id__company=request.user,status='rejected')
+        completed_submission=submission.objects.filter(program_id__company=request.user,status='completed')
         
         data={
             "all_submission":CompanySubmissionSerializer(all_submission,many=True).data,
@@ -296,9 +274,11 @@ class CompanySubmissionAPIView(APIView):
         return Response(response)
    
 class CompanySubmissionDetailsAPIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
     def get(self,request,pk):
         try:
-            submission_obj=submission.objects.get(program__company=user.id ,id=pk)
+            submission_obj=submission.objects.get(program__company=request.user.id ,id=pk)
             response={
                 "message":"success",
             "data":{
@@ -314,9 +294,11 @@ class CompanySubmissionDetailsAPIView(APIView):
 
 
 class CompanySubmissionRejectAPIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
     def get(self,request,pk):
-        if submission.objects.filter(program__company=user.id,id=pk).exists():
-            submission.objects.filter(program__company=user.id,id=pk).update(status="rejected")
+        if submission.objects.filter(program__company=request.user.id,id=pk).exists():
+            submission.objects.filter(program__company=request.user.id,id=pk).update(status="rejected")
             response={
                 "message":"Submission Rejected"
             }
@@ -328,24 +310,25 @@ class CompanySubmissionRejectAPIView(APIView):
         return Response(response)
 
 class CompanySubmissionAcceptAPIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
     def get(self,request,pk):
-        if not submission.objects.filter(program__company=user,id=pk).exists():
+        if not submission.objects.filter(program__company=request.user,id=pk).exists():
             response={
                 "message":"Could not find submission"
             }
             return Response(response)
 
-        data=submission.objects.get(program__company=user,id=pk)
+        data=submission.objects.get(program__company=request.user,id=pk)
         submission_id=pk
-        sender_id=user.id
+        sender_id=request.user.id
         receiver_id=data.user.id
         message="Your submission accepted"
         try:
-            submission.objects.filter(program__company=user.id,id=pk).update(status="accepted")
+            submission.objects.filter(program__company=request.user.id,id=pk).update(status="accepted")
             message_data=messages.objects.create(submission_id=submission_id,sender_id=sender_id,receiver_id=receiver_id,text=message)
             response={
-                "message":"Submission Acceped",
-                "message_data":message_data.id
+                "message":"Submission Accepeted",
             }
         except:
             response={
@@ -354,6 +337,8 @@ class CompanySubmissionAcceptAPIView(APIView):
         return Response(response)
         
 class CompanyLeaderBoardAPIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
     def get(self,request):
         data = professional.objects.filter(reward__gte=1).order_by('-reward')
         data1 = Student.objects.filter(reward__gte=1).order_by('-reward')
@@ -368,6 +353,8 @@ class CompanyLeaderBoardAPIView(APIView):
         return Response(response)
 
 class CompanyLeaderBoardDetailAPIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
     def get(self,request,pk):
         if Student.objects.filter(student_user__id=pk).exists():
             data=Student.objects.get(student_user__id=pk)
@@ -389,234 +376,22 @@ class CompanyLeaderBoardDetailAPIView(APIView):
         }
         return Response(response)
 
-class CompanySettingsChangeNameAPIView(APIView):
-    def post(self,request,format=None):
-        serializer=CompanyChangeNameSerializer(data=request.data)
-        if serializer.is_valid(raise_exception=True):
-            try:
-                first_name=request.data['first_name']
-                last_name=request.data['last_name']
-                profile_description=request.data['description']
-                if not first_name.isalpha() or not last_name.isalpha():
-                    message="first name or last name is invalid , only alphabet"
-                    return Response({"message":message})
-                User.objects.filter(id=user.id).update(first_name=first_name,last_name=last_name)
-                company.objects.filter(company_user = user).update(description=profile_description)
-                message='Successfully updated !'
-            except Exception as e:
-                message="Failed"
-                print(e)
-        else:
-            message="Retry once again"
-
-        response={
-            "message":message
-        }
-        return Response(response)
-
-class CompanySettingschangeUserNameAPIView(APIView):
-    def post(self,request,format=None):
-        serializer=CompanyChangeUserNameSerializer(data=request.data)
-        if serializer.is_valid(raise_exception=True):
-            print('if')
-        else:
-            print('else')
-        try:
-                regex  = "^([a-z]+('[a-z])?[0-9a-z]*)$"
-                print("reached_up")
-                username = request.data['username']
-                email = request.data['email']
-                password = request.data['password']
-                if not username or not email or not password:
-                    message="Fields should not be empty"
-                else:
-                    if not re.search(regex, username):
-                        message="Allowed are alphabet,number and apostrophe"
-
-                user = authenticate(
-                    request, username=user.username, password=password)
-                if user is not None:
-                    if user.username != username:
-                        if User.objects.filter(username=username).exists():
-                            message='Username already taken'
-                         
-                        else:
-                            User.objects.filter(id=user.id).update(username=username)
-                            message=' Username successfully updated !'
-
-                    if User.objects.filter(email=email).exists() or ExtendUser.objects.filter(optional_email=email).exists():
-                        print("reached in email2")
-                        message='Email already taken'
-                    else:
-                        token = str(uuid.uuid4())
-
-                        try:
-                            ExtendUser_obj= ExtendUser.objects.get(user=user.id)
-                            if user.email != email!=ExtendUser_obj.optional_email:
-                                ExtendUser.objects.filter(user=request.user.id).update(optional_email=email,optional_email_token =token,optional_email_status=False)
-                                send_email_verification_mail(email,token)
-                                message='Email successfully updated, Now Verify the email'
-
-                            else:
-                                message='You already added this Email'
-                            
-                        except:
-                            ExtendUser.objects.create(user=user,optional_email=email,optional_email_token=token)
-                            send_email_verification_mail(email,token)
-                            message='Email successfully Added, Now Verify the email '
-                            pass
-                
-                else:
-                    message='Password doesnot match'
-        except Exception as e:
-            message="failed"
-            print(e)
-        response={
-            "message":message,
-            "data":None
-        }
-        return Response(response)
-
-class CompanySettingsUploadImageAPIView(APIView):
-    def post(self,request,format=None):
-        data = company.objects.get(company_user=request.user.id)
-        serailzer= ComapnyImageUploadSerializer(data=request.data,)
-        if not request.FILES:
-            message="Image is empty"
-        if serailzer.is_valid():
-            data = company.objects.get(company_user=request.user.id)
-            if data.profile_picture == 'Null':
-                serailzer.save()
-
-            else:
-                file_exists=os.path.exists(data.profile_picture.path)
-                if file_exists == True:
-                    os.remove(data.profile_picture.path)
-            
-                serailzer.save()
-            message="Profile picture successfully updated !"
-
-        else:
-            message="Please select a valid image file"
-        response={
-            "message":message
-        }
-        return Response(response)
-
-class CompanySettingsUpdatePasswordAPIView(APIView):
-    def post(self,request,format=None):
-        serializer=CompanyUpdatePasswordSerializer(data=request.data)
-        if serializer.is_valid(raise_exception=True):
-            password_1=request.data['password1']
-            password_2=request.data['password2']
-            password_3=request.data['password3']
-            if not password_1 or not password_2 or not password_3:
-                message="Fields should not be empty"
-            user_obj = authenticate(request, username=user.username, password=password_1) 
-            if user_obj is not None:
-                if not password_2 and not password_3:
-                    message="New password confirm password should not be empty and length more than 9"
-                if password_2==password_3:
-                    print("reached")
-                    password=make_password(password_2)
-                    User.objects.filter(id=user.id).update(password=password)
-                    user_obj =authenticate(username=user.username, password=password)
-                    login(request,user_obj)
-                    message="New password updated successfully"
-                else:
-                    message="New password and confirm password not match"
-            else:
-                message="Old password not match"
-
-            print('if')
-        else:
-            message="failed"
-            print('else')
-        
-        response={
-            "data":None,
-            "message":message
-        }
-        return Response(response)
-
-
-
-class  ComapnySettingsOptionalEmailAPIView(APIView):
-    def post(self,request,format=None):
-        ExtendUser_obj=ExtendUser.objects.get(user=request.user.id)
-        print(ExtendUser_obj.optional_email_token)
-        token=request.data('token')
-        if ExtendUser_obj.optional_email_token == token:
-            message="email successfully verified"
-            ExtendUser.objects.filter(user=request.user.id).update(optional_email_status=True)
-        else:
-            message="Enter the right token"
-
-        response={
-            "message":message
-        }
-        return Response(response)
-
-
-
-class CompanySettingsPhoneValidateAPIView(APIView):
-    def post(self,request,format=None):
-        print("reached1")
-        country=request.data('country')
-        phone_number=request.data('phone_number')
-        code=request.data('code')
-        ExtendUser_obj=ExtendUser.objects.get(user=request.user.id)
-        if code :
-            try:
-                ValidateNumber_obj=ValidateNumber.objects.get(user=ExtendUser_obj.id)
-                if code == ValidateNumber_obj.code:
-                    ValidateNumber.objects.filter(user=ExtendUser_obj.id).update(status=True)
-                    message="Your phone number successfully validated"
-                else:
-                    message="Security code doesnot match"
-            except:
-                pass
-
-        else:
-            try:
-                ValidateNumber_obj=ValidateNumber.objects.get(user=ExtendUser_obj.id)
-
-            except:
-                ValidateNumber_obj="NULL"
-                number=f'{country}{phone_number}'
-                account_sid =settings.TWILIO_ACCOUNT_SID 
-                auth_token = settings.TWILIO_AUTH_TOKEN
-                client = Client(account_sid, auth_token)
-                validation_code=9023456
-                try:
-                        message_obj = client.messages.create(
-                                                body=f'Your Vulnbounty security code {validation_code}',
-                                                from_='+13862303382',
-                                                to=number
-                                            )
-                        ExtendUser_obj=ExtendUser.objects.get(user=request.user.id)
-                        ValidateNumber.objects.create(user=ExtendUser_obj,message_id=message_obj.sid,phone_number=number,code=validation_code)
-                        message="Security code send to given number"
-                except:
-                    message="Something went Wrong retry again"
-        response={
-            "message":message
-        }
-        return Response(response)
 
 class CompanySettingsAPIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
     def get(self,request):
         try:
-            program_count=submission.objects.filter(program__company=user.id).count()
-            company_obj=company.objects.get(company_user=user.id)
+            program_count=submission.objects.filter(program__company=request.user.id).count()
+            company_obj=company.objects.get(company_user=request.user.id)
             total_payment=payments.objects.filter(transfer_from = company_obj.id).aggregate(Sum('amount'))
             company_login_details_obj=company_login_details.objects.get(company=company_obj)
             try:
-                ExtendUser_obj=ExtendUser.objects.get(user=user.id)
+                ExtendUser_obj=ExtendUser.objects.get(user=request.user.id)
             
             except:
-                ExtendUser.objects.create(user=user)
-                ExtendUser_obj=ExtendUser.objects.get(user=user.id)
+                ExtendUser.objects.create(user=request.user)
+                ExtendUser_obj=ExtendUser.objects.get(user=request.user.id)
                 
             try:
                 ValidateNumber_obj=ValidateNumber.objects.get(user=ExtendUser_obj.id)
@@ -648,16 +423,184 @@ class CompanySettingsAPIView(APIView):
             print(e)
         return Response(response)
 
-class CompanyLogout(APIView):
-    def get(self,request):
-        try:
-            logout(request)
-            message="Successfully Logout"
-        except Exception as e:
-            message="somthing went wrong"
+
+class CompanySettingsChangeNameAPIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
+    def post(self,request,format=None):
+        serializer=CompanyChangeNameSerializer(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            try:
+                first_name=request.data['first_name']
+                last_name=request.data['last_name']
+                profile_description=request.data['description']
+                if not first_name.isalpha() or not last_name.isalpha():
+                    message="first name or last name is invalid , only alphabet"
+                    return Response({"message":message})
+                User.objects.filter(id=request.user.id).update(first_name=first_name,last_name=last_name)
+                company.objects.filter(company_user = request.user).update(description=profile_description)
+                message='Successfully updated !'
+            except Exception as e:
+                message="Failed"
+                print(e)
+        else:
+            message="Retry once again"
 
         response={
             "message":message
         }
         return Response(response)
+
+class CompanySettingschangeUserNameAPIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
+    def post(self,request,format=None):
+        serializer=CompanyChangeUserNameSerializer(data=request.data)
+        message=[]
+        if serializer.is_valid(raise_exception=True):
+            try:
+                regex  = "^([a-z]+('[a-z])?[0-9a-z]*)$"
+                print("reached_up")
+                username = request.data['username']
+                email = request.data['email']
+                password = request.data['password']
+                if not username or not email or not password:
+                    message="Fields should not be empty"
+                else:
+                    if not re.search(regex, username):
+                        message="Allowed are alphabet,number and apostrophe"
+                    else:
+                        pass
+
+                user = authenticate(
+                    request, username=request.user.username, password=password)
+                if user is not None:
+                    if request.user.username != username:
+                        
+                        if User.objects.filter(username=username).exists():
+                            message.append('Username already taken')
+                         
+                        else:
+                            User.objects.filter(id=user.id).update(username=username)
+                            message.append(' Username successfully updated !')
+                    if user.email != email:
+
+                        if User.objects.filter(email=email).exists() or ExtendUser.objects.filter(optional_email=email).exists():
+                            print("reached in email2")
+                            message.append('Email already taken')
+                        else:
+                            token = str(uuid.uuid4())
+
+                            try:
+                                ExtendUser_obj= ExtendUser.objects.get(user=user.id)
+                                if user.email != email!=ExtendUser_obj.optional_email:
+                                    print("update")
+                                    ExtendUser.objects.filter(user=request.user.id).update(optional_email=email,optional_email_token =token,optional_email_status=False)
+                                    send_optional_email_verification_mail(email,token)
+                                    message.append('Email successfully updated, Now Verify the email')
+
+                                else:
+                                    message.append('You already added this Email')
+                                
+                            except:
+                                print("create")
+                                ExtendUser.objects.create(user=user,optional_email=email,optional_email_token=token)
+                                send_email_verification_mail(request,email,token)
+                                message.append('Email successfully Added, Now Verify the email')
+                                
+                    
+                else:
+                    message.append('Password doesnot match')
+        
+            except Exception as e:
+                message="failed"
+                print(e)
+            response={
+                "message":message,
+                "data":None
+            }
+            
+        else:
+            response={
+                "message":"something went wrong",
+                "data":None
+            }
+       
+        return Response(response)
+
+
+class CompanySettingsUpdatePasswordAPIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
+    def post(self,request,format=None):
+        serializer=CompanyUpdatePasswordSerializer(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            password_1=request.data['password1']
+            password_2=request.data['password2']
+            password_3=request.data['password3']
+            if not password_1 or not password_2 or not password_3:
+                message="Fields should not be empty"
+            user_obj = authenticate(request, username=request.user.username, password=password_1) 
+            if user_obj is not None:
+                if not password_2 and not password_3:
+                    message="New password confirm password should not be empty and length more than 9"
+                if password_2==password_3:
+                    print("reached")
+                    password=make_password(password_2)
+                    User.objects.filter(id=request.user.id).update(password=password)
+                    user_obj =authenticate(username=request.user.username, password=password)
+                    login(request,user_obj)
+                    message="New password updated successfully"
+                else:
+                    message="New password and confirm password not match"
+            else:
+                message="Old password not match"
+
+            print('if')
+        else:
+            message="failed"
+            print('else')
+        
+        response={
+            "data":None,
+            "message":message
+        }
+        return Response(response)
+
+
+class CompanySettingsUploadImageAPIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
+    def post(self,request,format=None):
+        data = company.objects.get(company_user=request.user.id)
+        serailzer= ComapnyImageUploadSerializer(data ,data=request.data, partial=True)
+        if serailzer.is_valid(raise_exception=True):
+            if data.profile_picture == 'Null':
+                serailzer.save()
+                message="Profile picture successfully updated !"
+                print("if")
+            else:
+                print("else")
+                file_exists=os.path.exists(data.profile_picture.path)
+                if file_exists == True:
+                    os.remove(data.profile_picture.path)
+                serailzer.save()
+                message="Profile picture successfully updated !"
+            
+
+        else:
+            message="Please select a valid image file"
+        response={
+            "message":message
+        }
+        return Response(response)
+
+
+
+
+
+
+
+
+
                

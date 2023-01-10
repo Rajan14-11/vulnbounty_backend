@@ -17,7 +17,10 @@ urlpatterns = [
     path('leaderboard/detail/<int:pk>',views.CompanyLeaderBoardDetailAPIView.as_view()),
     path('setting/changename/',views.CompanySettingsChangeNameAPIView.as_view()),
     path('setting/changeusername/',views.CompanySettingschangeUserNameAPIView.as_view()),
-    path('setting/changepassword',views.CompanySettingsUpdatePasswordAPIView.as_view())
+    path('setting/changepassword/',views.CompanySettingsUpdatePasswordAPIView.as_view()),
+    path('setting/changeimage/',views.CompanySettingsUploadImageAPIView.as_view()),
+    
+
     
 
 ]

@@ -8,8 +8,7 @@ from django.conf import settings
 class company(models.Model):
     company_user=models.ForeignKey(User,on_delete=models.CASCADE,default="")
     company_name=models.CharField(max_length=100, null=True)
-    profile_picture=models.ImageField(upload_to='company/images/profile_picture',default='Null' , null=True,validators=[validate_image_file_extension])
-    background_picture=models.ImageField(upload_to='company/',default='/image.png', null=True)
+    profile_picture=models.ImageField(upload_to='company/images/profile_picture',default='Null' ,blank=True, null=True,validators=[validate_image_file_extension])
     description=models.CharField(max_length=200,null=True)
     forget_password_token=models.CharField(max_length=100,null=True)
     email_verification_token =models.CharField(max_length=100,null=True)
@@ -74,7 +73,7 @@ class rewards(models.Model):
 
 
 class companyProgram(models.Model):
-    company=models.ForeignKey(User, on_delete=models.CASCADE)
+    company=models.ForeignKey(User, on_delete=models.CASCADE,)
     slug=models.SlugField(max_length=30)
     title=models.CharField(max_length=100,default="Company Name ",blank=True)
     introduction=models.TextField(max_length=1000,blank=True,default='A bug bounty program')
@@ -83,12 +82,12 @@ class companyProgram(models.Model):
         ('R','Regional'),
         ('P','Private'),
     ]
-    vulnerability_concerns=models.TextField(max_length=1000,null=True)
+    vulnerability_concerns=models.TextField(max_length=1000,)
     region=models.CharField(max_length=3,default='all')
     visibility=models.CharField(max_length=1,choices=choices,default='G')
-    in_scope=models.ForeignKey(in_scope, on_delete=models.CASCADE,null=True)
-    out_scope=models.ForeignKey(out_scope,on_delete=models.CASCADE,null=True)
-    rewards=models.ForeignKey(rewards,on_delete=models.CASCADE,null=True)
+    in_scope=models.ForeignKey(in_scope, on_delete=models.CASCADE,)
+    out_scope=models.ForeignKey(out_scope,on_delete=models.CASCADE,)
+    rewards=models.ForeignKey(rewards,on_delete=models.CASCADE,)
     posted=models.BooleanField(default=False)
     creation_step=models.IntegerField(default=0)
     created_at=models.DateField(auto_now_add=True)
