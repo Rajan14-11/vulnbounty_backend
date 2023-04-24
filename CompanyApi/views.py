@@ -2,8 +2,8 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from .serializers import CompanyRegisterSerializer,CompanyProgramSerializer,CompanySubmissionSerializer,CompanyProfessionalLeaderBoardSerializer,CompanyStudentLeaderBoardSerializer,ComapnyImageUploadSerializer,CompanySettingsSerializer,CompanyLoginDetailsSerializer,CompanyExtendedUserSerializer,CompanyCreateProgramSerializer,CompanyCreateProgramInScopeSerializer,CompanyCreateProgramRewardSerializer,CompanyCreateProgramSaveSerializer,CompanyCreateProgramOutScopeSerializer
-from .serializers import CompanyChangeNameSerializer,CompanyChangeUserNameSerializer,CompanyUpdatePasswordSerializer
-from .models import company,companyProgram,submission,payments,company_login_details,company_wallet
+from .serializers import CompanyChangeNameSerializer,CompanyChangeUserNameSerializer,CompanyUpdatePasswordSerializer,CompanyWalletHistory
+from .models import company,companyProgram,submission,payments,company_login_details,company_wallet,company_wallet_history
 from django.contrib.auth.models import User
 from datetime import date
 from django.db.models import Sum
@@ -25,6 +25,7 @@ from rest_framework import status
 from .renderers import UserRender
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
+from MainApi.serializers import PhoneValidation
 from .decorators import allowed_users
 # Geneerate Token Manually
 def get_tokens_for_user(user):
@@ -63,34 +64,35 @@ class CompanyDashboardAPIView(APIView):
     # @allowed_users()
     def get(self,request):
         print(request.user.id)
-        try:
-            company_obj=company.objects.get(company_user=request.user.id)
-            submission_today=submission.objects.filter(program__company=request.user.id,created_at__date=date.today()).count()
-            submission_this_month=submission.objects.filter(program__company=request.user.id,created_at__month=date.today().month).count()
-            top_hunter=professional.objects.filter(reward__gte=1).order_by("-reward")[:5]
-            payment_today = payments.objects.filter(transfer_from=company_obj.id,created_at__date=date.today()).aggregate(Sum('amount'))
-            payment_this_month=payments.objects.filter(transfer_from = company_obj.id,created_at__month=date.today().month).aggregate(Sum('amount'))
-            message="success"
-            response={
-                "message":message,
-                "data":{
-                    "submission_today":submission_today,
-                    "submission_this_month":submission_this_month,
-                    "top_hunter":CompanyProfessionalLeaderBoardSerializer(top_hunter,many=True).data,
-                    "payment_today":payment_today,
-                    "payment_this_month":payment_this_month
-                }
-                
+        # try:
+        company_obj=company.objects.get(company_user=request.user.id)
+        submission_today=submission.objects.filter(program__company=request.user.id,created_at__date=date.today()).count()
+        submission_this_month=submission.objects.filter(program__company=request.user.id,created_at__month=date.today().month).count()
+        top_hunter=professional.objects.filter(reward__gte=1).order_by("-reward")[:5]
+        payment_today = payments.objects.filter(transfer_from=company_obj.id,created_at__date=date.today()).aggregate(Sum('amount'))
+        payment_this_month=payments.objects.filter(transfer_from = company_obj.id,created_at__month=date.today().month).aggregate(Sum('amount'))
+        message="success"
+        response={
+            "message":message,
+            "data":{
+                "submission_today":submission_today,
+                "submission_this_month":submission_this_month,
+                "top_hunter":CompanyProfessionalLeaderBoardSerializer(top_hunter,many=True).data,
+                "payment_today":payment_today,
+                "payment_this_month":payment_this_month
+            }
+            
 
-            }
-            return Response(response)
-        except Exception as e:
-            message="failed"
-            response={
-                "message":message,
-                "data":None
-            }
-            return Response(response)      
+        }
+        return Response(response)
+        # except Exception as e:
+            
+        #     message="failed"
+        #     response={
+        #         "message":message,
+        #         "data":None
+        #     }
+        #     return Response(response)      
 class CompanyProgramAPIView(APIView):
     renderer_classes=[UserRender]
     permission_classes=[IsAuthenticated]
@@ -255,17 +257,17 @@ class CompanySubmissionAPIView(APIView):
     permission_classes=[IsAuthenticated]
     def get(self,request):
         all_submission=submission.objects.filter(program_id__company=request.user)
-        pending_submission=submission.objects.filter(program_id__company=request.user,status='pending')
-        accepted_submission=submission.objects.filter(program_id__company=request.user,status='accepted')
-        rejected_submission=submission.objects.filter(program_id__company=request.user,status='rejected')
-        completed_submission=submission.objects.filter(program_id__company=request.user,status='completed')
+        # pending_submission=submission.objects.filter(program_id__company=request.user,status='pending')
+        # accepted_submission=submission.objects.filter(program_id__company=request.user,status='accepted')
+        # rejected_submission=submission.objects.filter(program_id__company=request.user,status='rejected')
+        # completed_submission=submission.objects.filter(program_id__company=request.user,status='completed')
         
         data={
             "all_submission":CompanySubmissionSerializer(all_submission,many=True).data,
-            "pending_submission":CompanySubmissionSerializer(pending_submission,many=True).data,
-            "accepted_submission":CompanySubmissionSerializer(accepted_submission,many=True).data,
-            "rejected_submission":CompanySubmissionSerializer(rejected_submission,many=True).data,
-            "completed_submission":CompanySubmissionSerializer(completed_submission,many=True).data,
+            # "pending_submission":CompanySubmissionSerializer(pending_submission,many=True).data,
+            # "accepted_submission":CompanySubmissionSerializer(accepted_submission,many=True).data,
+            # "rejected_submission":CompanySubmissionSerializer(rejected_submission,many=True).data,
+            # "completed_submission":CompanySubmissionSerializer(completed_submission,many=True).data,
             }
         response={
             "message":"success",
@@ -388,6 +390,7 @@ class CompanySettingsAPIView(APIView):
             company_login_details_obj=company_login_details.objects.get(company=company_obj)
             try:
                 ExtendUser_obj=ExtendUser.objects.get(user=request.user.id)
+                validate_obj=ValidateNumber
             
             except:
                 ExtendUser.objects.create(user=request.user)
@@ -406,12 +409,13 @@ class CompanySettingsAPIView(APIView):
             response={
                 "message":"success",
                 "data":{ 
-                "company_obj":CompanySettingsSerializer(company_obj).data,
+                "details":CompanySettingsSerializer(company_obj).data,
                 "program_count":program_count,
                 "total_payment":total_payment,
-                "company_login_details_obj":CompanyLoginDetailsSerializer(company_login_details_obj).data,
-                "ExtendUser_obj":CompanyExtendedUserSerializer(ExtendUser_obj).data,
-                "ValidateNumber_obj":ValidateNumber_obj,}
+                "login_details":CompanyLoginDetailsSerializer(company_login_details_obj).data,
+                "ExtendUser":CompanyExtendedUserSerializer(ExtendUser_obj).data,
+                "ValidateNumber":PhoneValidation(ValidateNumber_obj).data,
+                }
             
 
                 }
@@ -458,62 +462,63 @@ class CompanySettingschangeUserNameAPIView(APIView):
         serializer=CompanyChangeUserNameSerializer(data=request.data)
         message=[]
         if serializer.is_valid(raise_exception=True):
-            try:
-                regex  = "^([a-z]+('[a-z])?[0-9a-z]*)$"
-                print("reached_up")
-                username = request.data['username']
-                email = request.data['email']
-                password = request.data['password']
-                if not username or not email or not password:
-                    message="Fields should not be empty"
+            # try:
+            regex  = "^([a-z]+('[a-z])?[0-9a-z]*)$"
+            print("reached_up")
+            username = request.data['username']
+            email = request.data['email']
+            password = request.data['password']
+            if not username or not email or not password:
+                message="Fields should not be empty"
+            else:
+                if not re.search(regex, username):
+                    message="Allowed are alphabet,number and apostrophe"
                 else:
-                    if not re.search(regex, username):
-                        message="Allowed are alphabet,number and apostrophe"
-                    else:
-                        pass
+                    pass
 
-                user = authenticate(
-                    request, username=request.user.username, password=password)
-                if user is not None:
-                    if request.user.username != username:
-                        
-                        if User.objects.filter(username=username).exists():
-                            message.append('Username already taken')
-                         
-                        else:
-                            User.objects.filter(id=user.id).update(username=username)
-                            message.append(' Username successfully updated !')
-                    if user.email != email:
-
-                        if User.objects.filter(email=email).exists() or ExtendUser.objects.filter(optional_email=email).exists():
-                            print("reached in email2")
-                            message.append('Email already taken')
-                        else:
-                            token = str(uuid.uuid4())
-
-                            try:
-                                ExtendUser_obj= ExtendUser.objects.get(user=user.id)
-                                if user.email != email!=ExtendUser_obj.optional_email:
-                                    print("update")
-                                    ExtendUser.objects.filter(user=request.user.id).update(optional_email=email,optional_email_token =token,optional_email_status=False)
-                                    send_optional_email_verification_mail(email,token)
-                                    message.append('Email successfully updated, Now Verify the email')
-
-                                else:
-                                    message.append('You already added this Email')
-                                
-                            except:
-                                print("create")
-                                ExtendUser.objects.create(user=user,optional_email=email,optional_email_token=token)
-                                send_email_verification_mail(request,email,token)
-                                message.append('Email successfully Added, Now Verify the email')
-                                
+            user = authenticate(
+                request, username=request.user.username, password=password)
+            if user is not None:
+                print("no user")
+                if request.user.username != username:
                     
-                else:
-                    message.append('Password doesnot match')
+                    if User.objects.filter(username=username).exists():
+                        message.append('Username already taken')
+                        
+                    else:
+                        User.objects.filter(id=user.id).update(username=username)
+                        message.append(' Username successfully updated !')
+                if user.email != email and not ExtendUser.objects.filter(optional_email=email,user=user).exists() :
+
+                    if User.objects.filter(email=email).exists() or ExtendUser.objects.filter(optional_email=email).exists():
+                        print("reached in email2")
+                        message.append('Email already taken')
+                    else:
+                        token = str(uuid.uuid4())
+
+                        try:
+                            ExtendUser_obj= ExtendUser.objects.get(user=user.id)
+                            if user.email != email!=ExtendUser_obj.optional_email:
+                                print("update")
+                                ExtendUser.objects.filter(user=request.user.id).update(optional_email=email,optional_email_token =token,optional_email_status=False)
+                                send_optional_email_verification_mail(email,token)
+                                message.append('Email successfully updated, Now Verify the email')
+
+                            else:
+                                message.append('You already added this Email')
+                            
+                        except:
+                            print("create")
+                            ExtendUser.objects.create(user=user,optional_email=email,optional_email_token=token)
+                            send_email_verification_mail(request,email,token)
+                            message.append('Email successfully Added, Now Verify the email')
+                            
+                
+            else:
+                message.append('Password doesnot match')
         
-            except Exception as e:
-                message="failed"
+            # except Exception as e:
+            #     message="failed"
                 print(e)
             response={
                 "message":message,
@@ -597,6 +602,18 @@ class CompanySettingsUploadImageAPIView(APIView):
 
 
 
+class CompanyWalletHistoryApIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
+    def get(self,request,format=None):
+        company_obj=company.objects.get(company_user=request.user.id)
+        wallet_obj=company_wallet_history.objects.filter(company=company_obj)
+        response={
+            "data":{
+            "companyWallet":CompanyWalletHistory(wallet_obj,many=True).data
+            }
+        }
+        return Response(response)
 
 
 

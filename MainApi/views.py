@@ -7,7 +7,7 @@ import requests
 import json
 from rest_framework.response import Response
 import socket
-from .serializers import LoginSerializer,ValidatePhoneSerializer
+from .serializers import LoginSerializer,ValidatePhoneSerializer,PhoneValidation
 from django.contrib.auth import authenticate, login, logout
 from StudentApi.models import Student,student_login_details
 from CompanyApi.models import company,company_login_details
@@ -16,7 +16,7 @@ import datetime
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import ExtendUser,ValidateNumber
 from twilio.rest import Client
-
+from .renderers import UserRender
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
 
@@ -79,12 +79,15 @@ def get_tokens_for_user(user):
 #         return Response(data)
        
 class LoginAPIView(APIView):
+    renderer_classes=[UserRender]
     def post(self,request,format=None):
+        role=""
 
         h_name = socket.gethostname()
         IP_addres = socket.gethostbyname(h_name)
         serializer =LoginSerializer(data=request.data)
         if serializer.is_valid(raise_exception=True):
+            print("reached in valid")
             username = serializer.data['username']
             password = serializer.data['password']
             print(username,password)
@@ -93,48 +96,54 @@ class LoginAPIView(APIView):
             if user is not None:
                 token=get_tokens_for_user(user)
                 if Student.objects.filter(student_user=user.id).exists():
+                    role="student_dashboard"
+                    message="success"
                     student_obj=Student.objects.get(student_user=user.id)
                     login(request, user)
                     if student_login_details.objects.filter(student=student_obj).exists():
                         student_login_details_obj=student_login_details.objects.get(student=student_obj.id)
                         student_login_details.objects.filter(student=student_obj.id).update(ip_address=IP_addres,old_ip_address=student_login_details_obj.ip_address,new_login_time=datetime.datetime.now(),old_login_time=student_login_details_obj.new_login_time,host_name=h_name,old_host_name=student_login_details_obj.host_name)
-                        message="student_dashboard"
 
                     else:
                         student_login_details.objects.create(
                             student=student_obj,ip_address=IP_addres,old_ip_address=IP_addres,host_name=h_name,old_host_name=h_name,old_login_time=datetime.datetime.now(),
                         )
-                        message="student_dashboard"
+                       
                 elif professional.objects.filter(professional_user=user.id).exists():
+                    role="professional_dashboard"
+                    message="success"
                     professional_obj=professional.objects.get(professional_user=user.id)
                     login(request, user)
                     if professional_login_details.objects.filter(professional=professional_obj.id).exists():
                         professional_login_details_obj=professional_login_details.objects.get(professional=professional_obj)
                         professional_login_details.objects.filter(professional=professional_obj).update(ip_address=IP_addres,old_ip_address=professional_login_details_obj.ip_address,new_login_time=datetime.datetime.now(),old_login_time=professional_login_details_obj.new_login_time,host_name=h_name,old_host_name=professional_login_details_obj.host_name)
-                        message="professional_dashboard"
+                        
                     else:
                         professional_login_details.objects.create(professional=professional_obj,ip_address=IP_addres,old_ip_address=IP_addres,host_name=h_name,old_host_name=h_name,old_login_time=datetime.datetime.now())
-                        message="professional_dashboard"
                 elif company.objects.filter(company_user=user.id).exists():
+                    role="company_dashboard"
+                    message="success"
                     company_obj=company.objects.get(company_user=user.id)
                     login(request, user)
                     if company_login_details.objects.filter(company=company_obj.id).exists():
                         company_login_details_obj=company_login_details.objects.get(company=company_obj)
                         company_login_details.objects.filter(company=company_obj).update(ip_address=IP_addres,old_ip_address=company_login_details_obj.ip_address,new_login_time=datetime.datetime.now(),old_login_time=company_login_details_obj.new_login_time,host_name=h_name,old_host_name=company_login_details_obj.host_name)
-                        message="company_dashboard"
+                        
                         print(user.id)
                     else:
                         company_login_details.objects.create(company=company_obj,ip_address=IP_addres,old_ip_address=IP_addres,host_name=h_name,old_host_name=h_name,old_login_time=datetime.datetime.now())
-                        message="company_dashboard"
+                        
                 else:
-                    message="login"
-            else:
-                message="Username and Password doesn't match"
-            response={
+                    message="No User found"
+        else:
+            message="Try Again Later"
+          
+        response={
             "token":token,
-            "message":message
+            "message":message,
+            "role":role
                 }
-            return Response(response)
+        return Response(response)
 
         # try:
         #     client_key=request.POST.get('g-recaptcha-response')
@@ -164,6 +173,7 @@ class LoginAPIView(APIView):
        
 
 class ConfirmEmailAPIView(APIView):
+    renderer_classes=[UserRender]
     def get(self,request,token):
         try:
             if Student.objects.filter(email_verification_token =token).exists():
@@ -195,6 +205,7 @@ class ConfirmEmailAPIView(APIView):
 
 
 class  OptionalEmailAPIView(APIView):
+    renderer_classes=[UserRender]
     def get(self,request,token):
         ExtendUser_obj=ExtendUser.objects.get(user=request.user.id)
         if ExtendUser_obj.optional_email_token == token:
@@ -210,17 +221,39 @@ class  OptionalEmailAPIView(APIView):
 
 
 class PhoneValidateAPIView(APIView):
+    renderer_classes=[UserRender]
+    def get(self,request):
+        try:
+            ExtendUser_obj=ExtendUser.objects.get(user=request.user.id)
+            ValidateNumber_obj=ValidateNumber.objects.get(user=ExtendUser_obj.id)
+            response={
+                "message":"success",
+                "data":{
+                    "phone_validation":PhoneValidation(ValidateNumber_obj).data,
+                }
+            }
+        except:
+             response={
+                "message":"failed",
+                "data":None
+            }
+
+        return Response(response)
+
+
     def post(self,request,format=None):
         serializer=ValidatePhoneSerializer(data=request.data)
+        message=""
         if serializer.is_valid(raise_exception=True):
             country=request.data['country_code']
             phone_number=request.data['phone_number']
-            try:
-                code=request.data['code']
-            except:
-                code=None
+            code=request.data['code']
+            # try:
+                
+            # except:
+            #     code=None
             ExtendUser_obj=ExtendUser.objects.get(user=request.user.id)
-            if code :
+            if type(code) == int :
                 try:
                     ValidateNumber_obj=ValidateNumber.objects.get(user=ExtendUser_obj.id)
                     if code == ValidateNumber_obj.code:
@@ -229,6 +262,7 @@ class PhoneValidateAPIView(APIView):
                     else:
                         message="Security code doesnot match"
                 except:
+                    message="Something went Wrong retry again"
                     pass
 
             else:
@@ -278,3 +312,4 @@ class Logout(APIView):
             "message":message
         }
         return Response(response)
+    

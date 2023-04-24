@@ -6,7 +6,7 @@ from django.conf import settings
 from CompanyApi.models import companyProgram
 # Create your models here.
 class professional(models.Model):
-    professional_user = models.ForeignKey(User,on_delete=models.CASCADE)
+    professional_user = models.ForeignKey(User,related_name='professional_user',on_delete=models.CASCADE)
     phone=models.IntegerField(null = True)
     profile_picture=models.ImageField(null = True,blank = True,upload_to='professional/images/profile_picture',default='Null',validators=[validate_image_file_extension])
     profile_description=models.CharField(null = True,max_length=60)

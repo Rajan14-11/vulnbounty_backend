@@ -1,0 +1,21 @@
+professional register(/api/professional/register/)->post
+professional dashboard(/api/professional/dashboard/)->get
+professional program(/api/professional/programs/)->get
+professional program details(/api/professional/program/details/2)->get
+professional program submission list(/api/professional/submission/)->get
+professional submit program(/api/professional/submission/)->post
+professional submission details(/api/professional/submission/details/2)->get
+professional leaderboard(/api/professional/leaderboard/)->get
+professional leader details(/api/professional/leaderboard/details/1)->get
+professional settings(/api/professional/setting/)->get
+professional settings firstname,lastname and description(/api/professional/settings/changename/)->post
+professional setting change username and optional email(/api/professional/settings/changeusername/)->post
+professional change password(/api/professional/settings/changepassword/)->post
+professional skills list(/api/professional/settings/skill/)->get
+professional create skills(/api/professional/settings/skill/)->post
+professional delete skills(api/professional/settings/skill/1)->get
+professional change profile picture(/api/professional/settings/uploadimage/)->post
+professional change resume(/api/professional/settings/resume/)->post
+professional favourite list(/api/professional/favourite/)->get
+professional information(/api/professional/information/)->get
+professional add information(/api/professional/information/)->post

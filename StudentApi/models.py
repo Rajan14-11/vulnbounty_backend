@@ -24,7 +24,7 @@ class Student(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 class skills(models.Model):
-    user=models.ForeignKey(User,on_delete=models.CASCADE) 
+    user=models.ForeignKey(Student,on_delete=models.CASCADE) 
     skill=models.CharField(max_length=40,)
 
 class student_wallet(models.Model):

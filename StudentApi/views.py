@@ -6,28 +6,28 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.db.models import Q
 from StudentApi.models import *
-from SubmissionApi.models import *
-from ProgramsApi.models import *
+# from SubmissionApi.models import *
+# from ProgramsApi.models import *
 from CompanyApi.models import *
 from datetime import date
 from django.db.models import Sum
 from StudentApi.serializers import *
-from ProgramsApi.serializers import *
-from SubmissionApi.serializers import *
+# from ProgramsApi.serializers import *
+# from SubmissionApi.serializers import *
 from CompanyApi.serializers import *
 import json 
 from django.http import JsonResponse
-from SubmissionApi.forms import *
-from ChatApi.models import *
-from ChatApi.serializers import *
+# from SubmissionApi.forms import *
+# from ChatApi.models import *
+# from ChatApi.serializers import *
 import stripe
 from django.contrib import messages as message
-from ExtendUserApi.models import ExtendUser,ValidateNumber
+# from ExtendUserApi.models import ExtendUser,ValidateNumber
 from django.contrib.auth import authenticate, login, logout
 import uuid
 import os 
 from django.core.files.base import ContentFile
-from CompanyApi.forms import *
+# from CompanyApi.forms import *
 
 from asyncio.windows_events import NULL
 import code
@@ -46,205 +46,487 @@ from django.db.models import Q
 from twilio.rest import Client
 from django.core.files.base import ContentFile
 import base64, secrets
-from StudentApi.helpers import send_email_verification_mail
+from StudentApi.helpers import send_email_verification_mail,send_optional_email_verification_mail
 import uuid
 from .serializers import *
 from django.http import JsonResponse
-from ProfessionalApi.forms import *
-from ExtendUserApi.serializers import *
+# from ProfessionalApi.forms import *
+# from ExtendUserApi.serializers import *
 import requests
 from CompanyApi.models import *
 from CompanyApi.serializers import CompanyProgramSerializer
+from rest_framework_simplejwt.tokens import RefreshToken
+from .renderers import UserRender
+from rest_framework.permissions import IsAuthenticated
 # Create your views here.
  # --------------------- DASHBOARD ------------------------------
-user_id=4
+def get_tokens_for_user(user):
+    refresh = RefreshToken.for_user(user)
 
-user=User.objects.get(id=user_id)
+    return {
+        'refresh': str(refresh),
+        'access': str(refresh.access_token),
+    }
 
-
-class ProfessionalRegisterAPIView(APIView):
-     def post(self,request):
+class StudentRegisterAPIView(APIView):
+    renderer_classes=[UserRender]
+    def post(self,request,format=None):
         serializer=StudentRegisterSdrializer(data=request.data)
-        print(request.data)
-        client_key=request.data('g-recaptcha-response')
-        secret_key=settings.RECAPTCHA_SECRET_KEY
-        captcha_data={
-                "secret":secret_key,
-                "response":client_key
-            }
-        response_data=requests.post('https://www.google.com/recaptcha/api/siteverify',captcha_data)
-        response=json.loads(response_data.text)
-        verify=response['success']
-        print(f'verify is = {verify}')
-        verify=True
-        if verify == True:
-            terms_and_policy=request.data('terms_and_policy')
-            if not terms_and_policy == 'checked':
-                message="please tick the privacy policy and terms"
+        if serializer.is_valid(raise_exception=True):
+            email_token = str(uuid.uuid4())
+            user=serializer.save()
+            student_obj = Student.objects.create(student_user=user,email_verification_token=email_token,terms_and_policy=True)
+            token=get_tokens_for_user(user)
+            if student_obj:
+                student_wallet.objects.create(student=student_obj)
+                send_email_verification_mail(request,user.email,email_token )
+                message='Account created Successfully ! verify your email'
             else:
-                if serializer.is_valid(raise_exception=True):
-                    password=serializer.cleaned_data.get('password')
-                    confirm_password=serializer.cleaned_data.get('confirm_password')
-                    if password != confirm_password:
-                        message="password and confirm pasword didn't match"
-                        return Response({"message":message})
-                    token = str(uuid.uuid4())
-                    user=serializer.save(commit=False)
-                    user.password=make_password(request.POST['password'])
-                    user.username=serializer.cleaned_data['username']
-                    user.email_verification_token=  token
-                    user.save()
-                    company_obj = company.objects.create(company_user=user,email_verification_token= token,terms_and_policy=True)
-                    if company_obj:
-                        company_wallet.objects.create(company=company_obj)
-                        send_email_verification_mail(request,user.email,token)
-                        messsage='Account created Successfully ! verify your email'
-                    else:
-                        message='Account not created retry again'
-                    return Response({"path":"ifreached"})
-                    
-                else:
-                    print("elsereached")
-                    return Response({"path":"elsereached"})
+                message='Account not created retry again'
+            return Response({"token":token,"message":message})
+            
         else:
-            message="reCAPTCHA not verifyied"
-        return Response({"message":messsage}) 
+            print("elsereached")
+            return Response({"message":"Try again later"})  
+
+
+class StudentDashboardAPIView(APIView):
+        renderer_classes=[UserRender]
+        permission_classes=[IsAuthenticated]
+        def get(self,request):
+            try:
+                submission_today=submission.objects.filter(user=request.user.id,created_at__date=date.today()).count()
+                submission_this_month=submission.objects.filter(user=request.user.id,created_at__month=date.today().month).count()
+                leaderboard= Student.objects.filter(reward__gte=1).order_by('-reward')[:5]
+                program=companyProgram.objects.filter(created_at=date.today())[:5]
+                payment_today = payments.objects.filter(transfer_to=request.user.id,created_at__date=date.today()).aggregate(Sum('amount'))
+                payment_this_month=payments.objects.filter(transfer_to =request.user.id,created_at__month=date.today().month).aggregate(Sum('amount'))
+
+                response={
+                    "message":'success',
+                    "data":{'user':request.user.username,
+                "submission_today":submission_today,
+                "submission_this_month":submission_this_month,
+                "top_hunter":StudentDashbordserializer(leaderboard,many=True).data,
+                "program":CompanyProgramSerializer(program,many=True).data,
+                "payment_today":payment_today,
+                "payment_this_month":payment_this_month
+                }}
+            except Exception as e:
+                print(e)
+                response={
+                    "message":"Failed",
+                    "data":None
+                }
+            return Response(response)
+
+class StudentPrgramAPIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
+    def get(self,request):
+            professional_obj=Student.objects.get(student_user=request.user)
+            professional_information_obj=student_information.objects.get(student=professional_obj.id)
+            region=professional_information_obj.country_names
+            data=companyProgram.objects.all().filter((Q(region ='all') | Q(region = region) )) # & ~Q(visibility='P')
+            # invited_program=private_invitation.objects.filter(hunter=professional_obj.id)
+            response={
+                "message":"success",
+                "data":{
+                    "programs":CompanyProgramSerializer(data,many=True).data
+                }
+            }
+            return Response(response)
+
+
+class StudentProgramDetailsAPIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
+    def get(self,request,pk):
+        # if submission.objects.filter(program=id,user=request.user.id).exists():
+        try:
+            data=companyProgram.objects.get(id=pk)
+            message="Success"
+            serializer=CompanyProgramSerializer(data).data
+        except:
+            serializer=None
+            message="Failed"
+        response={
+            "message":message,
+            "data":{
+                "program_obj":serializer
+            }
+        }
+        return Response(response)
   
 
-
-
-
-class DashboardView(APIView):
-    def get(self,request,format=None):
-        user=User.objects.get(id=2)
-        profile=Student.objects.get(student_user=user)
-        serializers=StudentSerializer(profile)
-        data=serializers.data
-        submission_today=submission.objects.filter(user=request.user.id,created_at__date=date.today()).count()
-        submission_this_month=submission.objects.filter(user=request.user.id,created_at__month=date.today().month).count()
-        leaderboard= Student.objects.filter(reward__gte=1).order_by('-reward')[:5]
-        serializers=StudentSerializer(leaderboard,many=True)
-        data1=serializers.data
-        program=companyProgram.objects.filter(created_at=date.today())[:5]
-        payment_today = payments.objects.filter(transfer_to=request.user.id,created_at__date=date.today()).aggregate(Sum('amount'))
-        payment_this_month=payments.objects.filter(transfer_to = request.user.id,created_at__month=date.today().month).aggregate(Sum('amount'))
-        context={
-            'user':request.user.username,
-            'profile':data,
-            "submission_today":submission_today,
-            "submission_this_month":submission_this_month,
-            "leaderboard":data1,
-            "program":CompanyProgramSerializer(program,many=True).data,
-             "payment_today":payment_today,
-            "payment_this_month":payment_this_month
+class StudentSubmissionAPIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
+    def get(self,request):
+        all_submission=submission.objects.filter(user=request.user.id)
+        response={
+            "message":"success",
+            "data":{
+                "all_submission":CompanySubmissionSerializer(all_submission,many=True).data,
             }
+        }
 
-        return Response(context)
-
+        return Response(response)
+    def post(self,request):
+        serializer=StudentprogramSubmissionSerializer(data=request.data)
+        if  serializer.is_valid(raise_exception=True):
+            program_obj=companyProgram.objects.get(id=serializer.data['program_id'])
+            if submission.objects.filter(program=program_obj,user=request.user).exists():
+                return Response({"message":"already done"})
+            else:
+                user = submission.objects.create(
+                title=serializer.data['title'],
+                report=serializer.data['report'],
+                program=program_obj,
+                user=request.user)
+                message="success"
+        else:
+            message="failed"
        
+        return Response({"message":message})
+
+
+class StudentSubmissionDetailsAPIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
+    def get(self,request,pk):
+        try:
+            data=submission.objects.get(program=pk,user=request.user.id)
+            response={
+            "message":"Success",
+            "data":{
+                "submission_details_obj":CompanySubmissionSerializer(data).data
+            }
+            }
+        except:
+            response={
+            "message":"Failed",
+            "data":None
+        }
+        return Response(response)
+class StudentLearderAPIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
+    def get(self,request):
+        try:
+            data = Student.objects.filter(reward__gte=1).order_by('-reward')
+            serialzer=StudentDashbordserializer(data,many=True).data
+            message="Success"
+        except :
+            serialzer=None
+            message="Failed"
+        
+        response={
+            "message":message,
+            "data":{
+                "student_obj":serialzer
+            }
+        }
+
+        return Response(response)
+
+
+class StudentLeaderDetailsAPIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
+    def get(self,request,pk):
+        try:
+            data=Student.objects.get(id=pk)
+            serialzer=StudentDashbordserializer(data).data
+            message="Success"
+        except :
+            serialzer=None
+            message="Failed"
+        response={
+            "message":message,
+            "data":{
+                "student_obj":serialzer
+            }
+        }
+        return Response(response)
+
+class StudentSettingsAPIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
+    def get(self,request):
+        try:
+            program_count=submission.objects.filter(program__company=request.user.id).count()
+            profesional_obj=Student.objects.get(student_user=request.user.id)
+            total_payment=payments.objects.filter(transfer_from = profesional_obj.id).aggregate(Sum('amount'))
+            professional_login_details_obj=student_login_details.objects.get(student=profesional_obj)
+            try:
+                ExtendUser_obj=ExtendUser.objects.get(user=request.user.id)
+            
+            except:
+                ExtendUser.objects.create(user=request.user)
+                ExtendUser_obj=ExtendUser.objects.get(user=request.user.id)
+                
+            try:
+                ValidateNumber_obj=ValidateNumber.objects.get(user=ExtendUser_obj.id)
+                if ValidateNumber_obj.status == True:
+                    ValidateNumber_status="True"
+                else:
+                    ValidateNumber_status="False"
+            except:
+                ValidateNumber_obj=None
+                ValidateNumber_status="False"
+                
+            response={
+                "message":"success",
+                "data":{ 
+                "details":StudentSettingsSerializer( profesional_obj).data,
+                "program_count":program_count,
+                "total_payment":total_payment,
+                "login_details":StudentLoginDetailsSerializer(professional_login_details_obj).data,
+                "ExtendUser":StudentExtendedUserSerializer(ExtendUser_obj).data,
+                "ValidateNumber":ValidateNumber_obj,}
+            
+
+                }
+        except Exception as e:
+            response={
+                "message":"failed",
+                "data":None
+            }
+            print(e)
+        return Response(response)
+
+
+class StudentSettingNameDescriptionAPIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
+    def post(self,request,format=None):
+        serializer=StudentChangeNameSerialzer(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            try:
+                first_name=request.data['first_name']
+                last_name=request.data['last_name']
+                profile_description=request.data['description']
+                if not first_name.isalpha() or not last_name.isalpha():
+                    message="first name or last name is invalid , only alphabet"
+                    return Response({"message":message})
+                User.objects.filter(id=request.user.id).update(first_name=first_name,last_name=last_name)
+                Student.objects.filter(student_user = request.user).update(profile_description=profile_description)
+                message='Successfully updated !'
+            except Exception as e:
+                message="Failed"
+                print(e)
+        else:
+            message="Retry once again"
+
+        response={
+            "message":message
+        }
+        return Response(response)
+
+
+class StudentSettingsUploadPictureAPIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
+    def post(self,request,format=None):
+        data = Student.objects.get( student_user=request.user.id)
+        serializer =StudentUpdateimageSerializer(data ,data=request.data,partial=True)
+        if serializer.is_valid(raise_exception=True):
+            if data.profile_picture == 'Null':
+                serializer.save()
+                message="Successfully updated !"
+            else:
+                file_exists=os.path.exists(data.profile_picture.path)
+                if file_exists == True:
+                    os.remove(data.profile_picture.path)
+                serializer.save()
+            message="Successfully updated !"
+            return Response({"message":message})
+        else:
+            return Response({"message":"Failed"})
+
+ 
+class StudentSettingsUserEmailAPIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
+    def post(self,request,format=None):
+        serializer=StudentChangeUserNameSerializer(data=request.data)
+        message=[]
+        if serializer.is_valid(raise_exception=True):
+            try:
+                regex  = "^([a-z]+('[a-z])?[0-9a-z]*)$"
+                print("reached_up")
+                username = request.data['username']
+                email = request.data['email']
+                password = request.data['password']
+                if not username or not email or not password:
+                    message="Fields should not be empty"
+                else:
+                    if not re.search(regex, username):
+                        message="Allowed are alphabet,number and apostrophe"
+                    else:
+                        pass
+
+                user = authenticate(
+                    request, username=request.user.username, password=password)
+                if user is not None:
+                    if request.user.username != username:
+                        
+                        if User.objects.filter(username=username).exists():
+                            message='Username already taken'
+                            
+                        else:
+                            User.objects.filter(id=user.id).update(username=username)
+                            message=' Username successfully updated !'
+                    if user.email != email:
+
+                        if User.objects.filter(email=email).exists() or ExtendUser.objects.filter(optional_email=email).exists():
+                            print("reached in email2")
+                            message='Email already taken'
+                        else:
+                            token = str(uuid.uuid4())
+
+                            try:
+                                ExtendUser_obj= ExtendUser.objects.get(user=user.id)
+                                if user.email != email!=ExtendUser_obj.optional_email:
+                                    print("update")
+                                    ExtendUser.objects.filter(user=request.user.id).update(optional_email=email,optional_email_token =token,optional_email_status=False)
+                                    send_optional_email_verification_mail(email,token)
+                                    message='Email successfully updated, Now Verify the email'
+
+                                else:
+                                    message='You already added this Email'
+                                
+                            except:
+                                print("create")
+                                ExtendUser.objects.create(user=user,optional_email=email,optional_email_token=token)
+                                send_email_verification_mail(request,email,token)
+                                message='Email successfully Added, Now Verify the email'
+                                
+                    
+                else:
+                    message='Password doesnot match'
+        
+            except Exception as e:
+                message="failed"
+                print(e)
+            response={
+                "message":message,
+                "data":None
+            }
+            
+        else:
+            response={
+                "message":"something went wrong",
+                "data":None
+            }
+        
+        return Response(response)
+
+
+class StudentSettingsUpdatePasswordAPIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
+    def post(self,request,format=None):
+        serializer=StudentUpdatePasswordSerializer(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            password_1=request.data['password1']
+            password_2=request.data['password2']
+            password_3=request.data['password3']
+            if not password_1 or not password_2 or not password_3:
+                message="Fields should not be empty"
+            user_obj = authenticate(request, username=request.user.username, password=password_1) 
+            if user_obj is not None:
+                if not password_2 and not password_3:
+                    message="New password confirm password should not be empty and length more than 9"
+                if password_2==password_3:
+                    print("reached")
+                    password=make_password(password_2)
+                    User.objects.filter(id=request.user.id).update(password=password)
+                    user_obj =authenticate(username=request.user.username, password=password)
+                    login(request,user_obj)
+                    message="New password updated successfully"
+                else:
+                    message="New password and confirm password not match"
+            else:
+                message="Old password not match"
+
+            print('if')
+        else:
+            message="failed"
+            print('else')
+        
+        response={
+            "data":None,
+            "message":message
+        }
+        return Response(response)
+
+class StudentSettingsSkillsAPIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
+    def get(self,request,format=None):
+        try:
+            profe_user=Student.objects.get(student_user=request.user.id)
+            professional_obj=skills.objects.filter(user=profe_user.id)
+            response={
+                "message":"Success",
+                "data":{
+                    "skills":StudentSkillsSerializer(professional_obj,many=True).data
+                }
+            }
+        except Exception as e:
+            response={
+                "message":"Failed",
+                "data":None
+            }
+            print(e)
+        return Response(response)
+    def post(self,request,format=None):
+        serializer=StudentSkillsAddSerializer(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            print("reached")
+            profe_user=Student.objects.get(student_user=request.user.id)
+            skill=request.data['skill']
+            sample_skills = ["A# .NET","A# (Axiom)","A-0 System","A+","A++","ABAP","ABC","ABC ALGOL","ABLE","ABSET","ABSYS","ACC","Accent","Ace DASL","ACL2","ACT-III","Action!","ActionScript","Ada","Adenine","Agda","Agilent VEE","Agora","AIMMS","Alef","ALF","ALGOL 58","ALGOL 60","ALGOL 68","ALGOL W","Alice","Alma-0","AmbientTalk","Amiga E","AMOS","AMPL","APL","App Inventor for Android's visual block language","AppleScript","Arc","ARexx","Argus","AspectJ","Assembly language","ATS","Ateji PX","AutoHotkey","Autocoder","AutoIt","AutoLISP / Visual LISP","Averest","AWK","Axum","B","Babbage","Bash","BASIC","bc","BCPL","BeanShell","Batch (Windows/Dos)","Bertrand","BETA","Bigwig","Bistro","BitC","BLISS","Blue","Bon","Boo","Boomerang","Bourne shell","bash","ksh","BREW","BPEL","C","C--","C++","C#","C/AL","Caché ObjectScript","C Shell","Caml","Candle","Cayenne","CDuce","Cecil","Cel","Cesil","Ceylon","CFEngine","CFML","Cg","Ch","Chapel","CHAIN","Charity","Charm","Chef","CHILL","CHIP-8","chomski","ChucK","CICS","Cilk","CL","Claire","Clarion","Clean","Clipper","CLIST","Clojure","CLU","CMS-2","COBOL","Cobra","CODE","CoffeeScript","Cola","ColdC","ColdFusion","COMAL","Combined Programming Language","COMIT","Common Intermediate Language","Common Lisp","COMPASS","Component Pascal","Constraint Handling Rules","Converge","Cool","Coq","Coral 66","Corn","CorVision","COWSEL","CPL","csh","CSP","Csound","CUDA","Curl","Curry","Cyclone","Cython","D","DASL","DASL","Dart","DataFlex","Datalog","DATATRIEVE","dBase","dc","DCL","Deesel","Delphi","DinkC","DIBOL","Dog","Draco","DRAKON","Dylan","DYNAMO","E","E#","Ease","Easy PL/I","Easy Programming Language","EASYTRIEVE PLUS","ECMAScript","Edinburgh IMP","EGL","Eiffel","ELAN","Elixir","Elm","Emacs Lisp","Emerald","Epigram","EPL","Erlang","es","Escapade","Escher","ESPOL","Esterel","Etoys","Euclid","Euler","Euphoria","EusLisp Robot Programming Language","CMS EXEC","EXEC 2","Executable UML","F","F#","Factor","Falcon","Fancy","Fantom","FAUST","Felix","Ferite","FFP","Fjölnir","FL","Flavors","Flex","FLOW-MATIC","FOCAL","FOCUS","FOIL","FORMAC","@Formula","Forth","Fortran","Fortress","FoxBase","FoxPro","FP","FPr","Franz Lisp","Frege","F-Script","FSProg","G","Google Apps Script","Game Maker Language","GameMonkey Script","GAMS","GAP","G-code","Genie","GDL","Gibiane","GJ","GEORGE","GLSL","GNU E","GM","Go","Go!","GOAL","Gödel","Godiva","GOM (Good Old Mad)","Goo","Gosu","GOTRAN","GPSS","GraphTalk","GRASS","Groovy","Hack (programming language)","HAL/S","Hamilton C shell","Harbour","Hartmann pipelines","Haskell","Haxe","High Level Assembly","HLSL","Hop","Hope","Hugo","Hume","HyperTalk","IBM Basic assembly language","IBM HAScript","IBM Informix-4GL","IBM RPG","ICI","Icon","Id","IDL","Idris","IMP","Inform","Io","Ioke","IPL","IPTSCRAE","ISLISP","ISPF","ISWIM","J","J#","J++","JADE","Jako","JAL","Janus","JASS","Java","JavaScript","JCL","JEAN","Join Java","JOSS","Joule","JOVIAL","Joy","JScript","JScript .NET","JavaFX Script","Julia","Jython","K","Kaleidoscope","Karel","Karel++","KEE","Kixtart","KIF","Kojo","Kotlin","KRC","KRL","KUKA","KRYPTON","ksh","L","L# .NET","LabVIEW","Ladder","Lagoona","LANSA","Lasso","LaTeX","Lava","LC-3","Leda","Legoscript","LIL","LilyPond","Limbo","Limnor","LINC","Lingo","Linoleum","LIS","LISA","Lisaac","Lisp","Lite-C","Lithe","Little b","Logo","Logtalk","LPC","LSE","LSL","LiveCode","LiveScript","Lua","Lucid","Lustre","LYaPAS","Lynx","M2001","M4","Machine code","MAD","MAD/I","Magik","Magma","make","Maple","MAPPER","MARK-IV","Mary","MASM Microsoft Assembly x86","Mathematica","MATLAB","Maxima","Macsyma","Max","MaxScript","Maya (MEL)","MDL","Mercury","Mesa","Metacard","Metafont","MetaL","Microcode","MicroScript","MIIS","MillScript","MIMIC","Mirah","Miranda","MIVA Script","ML","Moby","Model 204","Modelica","Modula","Modula-2","Modula-3","Mohol","MOO","Mortran","Mouse","MPD","CIL","MSL","MUMPS","NASM","NATURAL","Napier88","Neko","Nemerle","nesC","NESL","Net.Data","NetLogo","NetRexx","NewLISP","NEWP","Newspeak","NewtonScript","NGL","Nial","Nice","Nickle","Nim","NPL","Not eXactly C","Not Quite C","NSIS","Nu","NWScript","NXT-G","o:XML","Oak","Oberon","Obix","OBJ2","Object Lisp","ObjectLOGO","Object REXX","Object Pascal","Objective-C","Objective-J","Obliq","Obol","OCaml","occam","occam-π","Octave","OmniMark","Onyx","Opa","Opal","OpenCL","OpenEdge ABL","OPL","OPS5","OptimJ","Orc","ORCA/Modula-2","Oriel","Orwell","Oxygene","Oz","P#","ParaSail (programming language)","PARI/GP","Pascal","Pawn","PCASTL","PCF","PEARL","PeopleCode","Perl","PDL","PHP","Phrogram","Pico","Picolisp","Pict","Pike","PIKT","PILOT","Pipelines","Pizza","PL-11","PL/0","PL/B","PL/C","PL/I","PL/M","PL/P","PL/SQL","PL360","PLANC","Plankalkül","Planner","PLEX","PLEXIL","Plus","POP-11","PostScript","PortablE","Powerhouse","PowerBuilder","PowerShell","PPL","Processing","Processing.js","Prograph","PROIV","Prolog","PROMAL","Promela","PROSE modeling language","PROTEL","ProvideX","Pro*C","Pure","Python","Q (equational programming language)","Q (programming language from Kx Systems)","Qalb","QtScript","QuakeC","QPL","R","R++","Racket","RAPID","Rapira","Ratfiv","Ratfor","rc","REBOL","Red","Redcode","REFAL","Reia","Revolution","rex","REXX","Rlab","RobotC","ROOP","RPG","RPL","RSL","RTL/2","Ruby","RuneScript","Rust","S","S2","S3","S-Lang","S-PLUS","SA-C","SabreTalk","SAIL","SALSA","SAM76","SAS","SASL","Sather","Sawzall","SBL","Scala","Scheme","Scilab","Scratch","Script.NET","Sed","Seed7","Self","SenseTalk","SequenceL","SETL","Shift Script","SIMPOL","SIGNAL","SiMPLE","SIMSCRIPT","Simula","Simulink","SISAL","SLIP","SMALL","Smalltalk","Small Basic","SML","Snap!","SNOBOL","SPITBOL","Snowball","SOL","Span","SPARK","Speedcode","SPIN","SP/k","SPS","Squeak","Squirrel","SR","S/SL","Stackless Python","Starlogo","Strand","Stata","Stateflow","Subtext","SuperCollider","SuperTalk","Swift (Apple programming language)","Swift (parallel scripting language)","SYMPL","SyncCharts","SystemVerilog","T","TACL","TACPOL","TADS","TAL","Tcl","Tea","TECO","TELCOMP","TeX","TEX","TIE","Timber","TMG","Tom","TOM","Topspeed","TPU","Trac","TTM","T-SQL","TTCN","Turing","TUTOR","TXL","TypeScript","Turbo C++","Ubercode","UCSD Pascal","Umple","Unicon","Uniface","UNITY","Unix shell","UnrealScript","Vala","VBA","VBScript","Verilog","VHDL","Visual Basic","Visual Basic .NET","Visual DataFlex","Visual DialogScript","Visual Fortran","Visual FoxPro","Visual J++","Visual J#","Visual Objects","Visual Prolog","VSXu","Vvvv","WATFIV, WATFOR","WebDNA","WebQL","Windows PowerShell","Winbatch","Wolfram","Wyvern","X++","X#","X10","XBL","XC","XMOS architecture","xHarbour","XL","Xojo","XOTcl","XPL","XPL0","XQuery","XSB","XSLT","XPath","Xtend","Yorick","YQL","Z notation","Zeno","ZOPL","ZPL"]
+        
+            if not skill:
+                message="Skill is empty"
+                return Response({"message":message})
+            if skill not in sample_skills:
+                message="Select Skill from given"
+                return Response({"message":message})
+            if skills.objects.filter(user=profe_user.id,skill=skill).exists():
+                message="Skill is already there"
+                return Response({"message":message})
+            else:
+                skills.objects.create(user=profe_user,skill=skill)
+                message="Skill added successfully"
+                return Response({"message":message})      
+
+
+class StudentFavouriteListAPIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
+    def get(self,request):
+        try:
+            student_data=Student.objects.get(student_user=request.user.id)
+            student_favourite_program_data=student_favourite_program.objects.filter(student=student_data.id)
+            serializer=StudentFavouriteProgramSerializer(student_favourite_program_data,many=True).data
+            
+            message="Success"
+        except:
+            message="Failed"
+            serializer=None
+        
+
+        response={
+            "message":message,
+            "data":serializer
+        }
+        return Response(response)
 # --------------------- PROGRAM --------------------------------     
 
-class ProgramView(APIView):
-    def get(self,request,format=None):
-        context={}
-        user=User.objects.get(id=2)
-        student_obj=Student.objects.get(student_user=user)
-        serializers=StudentSerializer(student_obj)
-        student_information_obj=student_information.objects.get(student=student_obj)
-        serializers=student_informationSerializer(student_information_obj)
-        stud_info_data=serializers.data
-        student_country=student_information_obj.country_names
-        startdate=request.POST.get('startdate')
-        enddate=request.POST.get('enddate')
-        if not startdate or not enddate:
-            print('Start date and End date is requird')
-        print(startdate,enddate)
-        data1=programs.objects.get(id=2)
-        serializers=programsSerializer(data1)
-        data_response=serializers.data
-        data=programs.objects.all().filter(Q(region ='all') | Q(region = student_country),created_at__range=(startdate,enddate))
-        print(data.count())
-        if data.count() == 0:
-            print('Not found any program in between the given date')
-        context={"data":data,
-        "student_country":student_country,}
-        data=programs.objects.all().filter(Q(region ='all') | Q(region = student_country))
-        student_data=Student.objects.get(student_user=user)
-        context_data={
-            "stud info":stud_info_data,
-            "Program details":data_response,
-            "student_country":student_country,
-        
-        }
-        return Response(context_data)
-
-    def post(self,request,format=None):
-        user=User.objects.get(id=2)
-        student_obj=Student.objects.get(student_user=user)
-        student_information_obj=student_information.objects.get(student=student_obj)
-        serializers=student_informationSerializer(student_information_obj)
-        student_country=student_information_obj.country_names
-        startdate=request.POST.get('startdate')
-        enddate=request.POST.get('enddate')
-        if not startdate or not enddate:
-            print('Start date and End date is requird')
-        print(startdate,enddate)
-        data=programs.objects.all().filter(Q(region ='all') | Q(region = student_country),created_at__range=(startdate,enddate))
-        print(data.count())
-        if data.count() == 0:
-            print('Not found any program in between the given date')
-        context={"data":data,
-        "student_country":student_country,}
-        data=programs.objects.all().filter(Q(region ='all') | Q(region = student_country))
-        student_data=Student.objects.get(student_user=user)
-        context_data={"data":data,
-            "student_country":student_country,
-        
-        }
-        return Response(serializers.data)
-
-
-class Programfilter(APIView):
-    def get(self,request,format=None):
-        user=User.objects.get(id=2)
-        student_obj=Student.objects.get(student_user=user)
-        student_information_obj=student_information.objects.get(student=student_obj)
-        serializers=student_informationSerializer(student_information_obj)
-        student_country=student_information_obj.country_names
-        startdate=request.POST.get('startdate')
-        enddate=request.POST.get('enddate')
-        if not startdate or not enddate:
-            print('Start date and End date is requird')
-        print(startdate,enddate)
-        data1=programs.objects.get(id=2)
-        serializers=programsSerializer(data1)
-        data_response=serializers.data
-        data=programs.objects.all().filter(Q(region ='all') | Q(region = student_country),created_at__range=(startdate,enddate))
-        print(data.count())
-        if data.count() == 0:
-            print('Not found any program in between the given date')
-        context={
-            "data1":data_response,
-            "data":data,
-        "student_country":student_country,}
-        data=programs.objects.all().filter(Q(region ='all') | Q(region = student_country))
-        student_data=Student.objects.get(student_user=user)
-        return Response(context)
-
-class Program_details_view(APIView):
-    def get(self,request,format=None):
-        user=User.objects.get(id=2)
-        Program_id=programs.objects.get(id=1)
-        serializers=programsSerializer(Program_id)
-        data=serializers.data
-        query=submission.objects.filter(program=Program_id,user=user)
-        serializers=submissionSerializer(query,many=True)
-        response=serializers.data
-        context={
-            'data':data,
-            'response':response
-        }
-        return Response(context)
 
 # --------------------- SUBMISSION -----------------------------
 

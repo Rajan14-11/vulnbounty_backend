@@ -19,6 +19,7 @@ urlpatterns = [
     path('setting/changeusername/',views.CompanySettingschangeUserNameAPIView.as_view()),
     path('setting/changepassword/',views.CompanySettingsUpdatePasswordAPIView.as_view()),
     path('setting/changeimage/',views.CompanySettingsUploadImageAPIView.as_view()),
+    path('wallethistory',views.CompanyWalletHistoryApIView.as_view())
     
 
     

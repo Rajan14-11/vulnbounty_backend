@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import companyProgram,submission,company,company_login_details,in_scope,rewards,out_scope
+from .models import companyProgram,submission,company,company_login_details,in_scope,rewards,out_scope,company_wallet_history
 from ProfessionalApi.models import professional
 from StudentApi.models import Student
 from MainApi.models import ExtendUser,ValidateNumber
@@ -88,24 +88,44 @@ class CompanyRegisterSerializer(serializers.ModelSerializer):
         user.set_password(validated_data['password'])
         user.save()
 
+
         return user
-         
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model=User
+        fields=["username","first_name","last_name","email"]
+
+class ProgramSerializer(serializers.ModelSerializer):
+    class Meta:
+        model=companyProgram
+        fields="__all__"
+
+class CompanyRewards(serializers.ModelSerializer):
+    class Meta:
+        model=rewards
+        fields="__all__"              
 class CompanyProgramSerializer(serializers.ModelSerializer):
+    company=UserSerializer(read_only=True)
+    rewards=CompanyRewards(read_only=True)
     class Meta:
         model=companyProgram
         fields="__all__"
 
 class CompanySubmissionSerializer(serializers.ModelSerializer):
+    user=UserSerializer(read_only=True)
+    program=CompanyProgramSerializer(read_only=True)
     class Meta:
         model=submission
         fields="__all__"
 
 class CompanyProfessionalLeaderBoardSerializer(serializers.ModelSerializer):
+    professional_user=UserSerializer(read_only=True)
     class Meta:
         model=professional
-        fields="__all__"
+        fields=['professional_user','phone','profile_picture','profile_description','resume','reward','optional_email','interst']
 
 class CompanyStudentLeaderBoardSerializer(serializers.ModelSerializer):
+    student_user=UserSerializer(read_only=True)
     class Meta:
         model=Student
         fields="__all__"
@@ -125,6 +145,7 @@ class ComapnyImageUploadSerializer(serializers.ModelSerializer):
 
 
 class CompanySettingsSerializer(serializers.ModelSerializer):
+    company_user=UserSerializer(read_only=True)
     class Meta:
         model=company
         fields="__all__"
@@ -190,11 +211,11 @@ class CompanyChangeNameSerializer(serializers.Serializer):
     last_name=serializers.CharField()
     description=serializers.CharField()
     
-class CompanyChangeUserNameSerializer(serializers.ModelSerializer):
+class CompanyChangeUserNameSerializer(serializers.Serializer):
     email=serializers.EmailField(required=True)
-    class Meta:
-        model=User
-        fields=['username','email','password']
+    username=serializers.CharField(required=True)
+    password=serializers.CharField(required=True)
+
 
 class CompanyUpdatePasswordSerializer(serializers.Serializer):
     password1=serializers.CharField()
@@ -202,3 +223,9 @@ class CompanyUpdatePasswordSerializer(serializers.Serializer):
     password3=serializers.CharField()
 
 
+class CompanyWalletHistory(serializers.ModelSerializer):
+    company=CompanySettingsSerializer(read_only=True)
+    recived_from=UserSerializer(read_only=True)
+    class Meta:
+        model=company_wallet_history
+        fields=['company',"amount",'description','recived_from','status','created_at']
