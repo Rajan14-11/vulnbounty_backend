@@ -1,5 +1,4 @@
 from rest_framework import serializers
-import re
 from django.contrib.auth import authenticate, login, logout
 from rest_framework_simplejwt.tokens import RefreshToken
 from StudentApi.models import Student,student_login_details

@@ -1,8 +1,5 @@
-from django.contrib.auth import decorators
-from django.http import HttpResponse
 from django.shortcuts import redirect
 from.models import company
-from django.contrib import messages as message
 from rest_framework.response import Response
 #unauthenicated user
 

@@ -1,7 +1,7 @@
-from django.shortcuts import render
+
 
 # Create your views here.
-from django.shortcuts import render
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.db.models import Q
@@ -15,8 +15,8 @@ from StudentApi.serializers import *
 # from ProgramsApi.serializers import *
 # from SubmissionApi.serializers import *
 from CompanyApi.serializers import *
-import json 
-from django.http import JsonResponse
+
+
 # from SubmissionApi.forms import *
 # from ChatApi.models import *
 # from ChatApi.serializers import *
@@ -28,18 +28,11 @@ import uuid
 import os 
 from django.core.files.base import ContentFile
 # from CompanyApi.forms import *
-
-from asyncio.windows_events import NULL
-import code
-import profile
-from typing import Optional
-from django.http import JsonResponse
-from django.shortcuts import redirect, render
 from django.contrib import messages as message
 from .models import *
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
-from django.core.exceptions import ValidationError
+
 from django.contrib.auth.hashers import make_password
 import re
 from django.db.models import Q
@@ -49,10 +42,10 @@ import base64, secrets
 from StudentApi.helpers import send_email_verification_mail,send_optional_email_verification_mail
 import uuid
 from .serializers import *
-from django.http import JsonResponse
+
 # from ProfessionalApi.forms import *
 # from ExtendUserApi.serializers import *
-import requests
+
 from CompanyApi.models import *
 from CompanyApi.serializers import CompanyProgramSerializer
 from rest_framework_simplejwt.tokens import RefreshToken

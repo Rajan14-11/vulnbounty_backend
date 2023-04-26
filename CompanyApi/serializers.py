@@ -3,11 +3,8 @@ from django.contrib.auth.models import User
 from .models import companyProgram,submission,company,company_login_details,in_scope,rewards,out_scope,company_wallet_history
 from ProfessionalApi.models import professional
 from StudentApi.models import Student
-from MainApi.models import ExtendUser,ValidateNumber
+from MainApi.models import ExtendUser
 import re
-import requests
-import json
-from django.conf import settings
 # from rest_framework_recaptcha import ReCaptchaField
 
 

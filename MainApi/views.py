@@ -1,10 +1,5 @@
-from django.shortcuts import render
 from rest_framework.views import APIView
-from rest_framework import status
-from django.http import JsonResponse
 from django.conf import settings
-import requests
-import json
 from rest_framework.response import Response
 import socket
 from .serializers import LoginSerializer,ValidatePhoneSerializer,PhoneValidation

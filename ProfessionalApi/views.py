@@ -11,8 +11,6 @@ import re
 import uuid
 from MainApi.models import ExtendUser,ValidateNumber
 from .helpers import send_email_verification_mail,send_optional_email_verification_mail
-import base64, secrets
-from django.core.files.base import ContentFile
 import os
 from twilio.rest import Client
 from django.conf import settings
