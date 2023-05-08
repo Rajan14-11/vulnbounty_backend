@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from django.conf import settings
 from rest_framework.response import Response
 import socket
-from .serializers import LoginSerializer,ValidatePhoneSerializer,PhoneValidation
+from .serializers import LoginSerializer,ValidatePhoneSerializer,PhoneValidation,ForgotPasswordSerializer,ChangePasswordSerializer
 from django.contrib.auth import authenticate, login, logout
 from StudentApi.models import Student,student_login_details
 from CompanyApi.models import company,company_login_details
@@ -12,6 +12,10 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from .models import ExtendUser,ValidateNumber
 from twilio.rest import Client
 from .renderers import UserRender
+import uuid
+from .helpers import send_forget_password_mail,send_email_verification_mail
+from django.contrib.auth.models import User
+from django.contrib.auth.hashers import make_password
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
 
@@ -76,6 +80,7 @@ def get_tokens_for_user(user):
 class LoginAPIView(APIView):
     renderer_classes=[UserRender]
     def post(self,request,format=None):
+        # User.objects.all().delete()
         role=""
 
         h_name = socket.gethostname()
@@ -292,9 +297,109 @@ class PhoneValidateAPIView(APIView):
             }
         return Response(response)
 
+class ForgotPasswordAPIView(APIView):
+    renderer_classes=[UserRender]
+    def post(self,request):
+        serializer=ForgotPasswordSerializer(data=request.data)
+        message=""
+        if serializer.is_valid(raise_exception=True):
+            username=request.data['username']
+            print(username)
+            if not User.objects.filter(username = username).first():
+                message="you will get reset password if you registered with this username"
+            user_obj = User.objects.get(username=username)
+            token = str(uuid.uuid4())
+            if Student.objects.filter(student_user=user_obj.id).exists():
+                student_data=Student.objects.get(student_user=user_obj.id)
+                student_data.forget_password_token = token
+                student_data.save()
+                send_forget_password_mail(user_obj.email,token,request)
+                message="you will get reset password if you registered with this username"
+            if professional.objects.filter(professional_user=user_obj.id).exists():
+                professional_data = professional.objects.get(professional_user = user_obj.id)
+                professional_data.forget_password_token = token
+                professional_data.save()
+                send_forget_password_mail(user_obj.email,token,request)
+                message="you will get reset password if you registered with this username"
+            if company.objects.filter(company_user=user_obj.id).exists():
+                company_data = company.objects.get(company_user = user_obj.id)
+                company_data.forget_password_token = token
+                company_data.save()
+                send_forget_password_mail(user_obj.email,token,request)
+                message="you will get reset password if you registered with this username"
+                
+        response={
+            "message":message
+        }
+        return Response(response)
+    
+class ChangePasswordAPIView(APIView):
+    renderer_classes=[UserRender]
+    def post(self,request):
+        serializer=ChangePasswordSerializer(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            token=request.data['token']
+            if Student.objects.filter(forget_password_token=token).exists():
+                student_obj =Student.objects.filter(forget_password_token=token).first()
+                user_id=student_obj.student_user.id    
+            if professional.objects.filter(forget_password_token=token).exists():
+                professional_obj = professional.objects.filter(forget_password_token=token).first()
+                user_id=professional_obj.professional_user.id
+            if company.objects.filter(forget_password_token=token).exists():
+                company_obj = company.objects.filter(forget_password_token=token).first()
+                user_id=company_obj.company_user.id
+            password_1=request.data['password']
+            password_2=request.data['confirm_password']
+            if password_1==password_2:
+                password=make_password(password_2)
+                User.objects.filter(id=user_id).update(password=password)
+                message="New password updated successfully"
+            else:
+                message="New password and confirm password not match"
+        else:
+            message="Retry again"
+        response={
+            "message":message
+        }
+        return Response(response)
+    
 
-
-
+class EmailVerificationAPIView(APIView):
+    renderer_classes=[UserRender]
+    def post(self,request):
+        serializer=ForgotPasswordSerializer(data=request.data)
+        message=""
+        if serializer.is_valid(raise_exception=True):
+            username=request.data['username']
+            print(username)
+            if not User.objects.filter(username = username).first():
+                message="you will get email verification if you registered with this username "
+            user_obj = User.objects.get(username=username)
+            token = str(uuid.uuid4())
+            if Student.objects.filter(student_user=user_obj.id).exists():
+                student_data=Student.objects.get(student_user=user_obj.id)
+                student_data.email_verification_token = token
+                student_data.save()
+                send_email_verification_mail(user_obj.email,token,request)
+                message="you will get email verification if you registered with this username "
+            if professional.objects.filter(professional_user=user_obj.id).exists():
+                professional_data = professional.objects.get(professional_user = user_obj.id)
+                professional_data.email_verification_token = token
+                professional_data.save()
+                send_email_verification_mail(user_obj.email,token,request)
+                message="you will get email verification if you registered with this username "
+            if company.objects.filter(company_user=user_obj.id).exists():
+                company_data = company.objects.get(company_user = user_obj.id)
+                company_data.email_verification_token = token
+                company_data.save()
+                send_email_verification_mail(user_obj.email,token,request)
+                message="you will get email verification if you registered with this username "
+                
+        response={
+            "message":message
+        }
+        return Response(response)
+    
 class Logout(APIView):
     def get(self,request):
         try:

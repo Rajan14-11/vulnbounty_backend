@@ -41,47 +41,6 @@ class company_login_details(models.Model):
     new_login_time = models.DateTimeField(auto_now=True)
     host_name = models.CharField(max_length=50,null = False,default="NULL")
     old_host_name = models.CharField(max_length=50,null = False,default="NULL")
-class in_scope(models.Model):
-    target=models.URLField(max_length=200,)
-    choices=[
-        ('WT','Website Testing'),
-        ('AT','API Testing'),
-        ('IS','iOS Application'),
-        ('AD','Android Application'),
-        ('IT','IoT Testing'),
-        ('HT','Hardware Testing'),
-        ('OT','Others')
-    ]
-    scope_type=models.CharField( max_length=2,choices=choices,default='OT')
-class tags(models.Model):
-    choices=[
-        ('WT','Website Testing'),
-        ('AT','API Testing'),
-        ('IS','iOS Application'),
-        ('AD','Android Application'),
-        ('IT','IoT Testing'),
-        ('HT','Hardware Testing'),
-        ('OT','Others')
-    ]
-    scope_type=models.CharField( max_length=2,choices=choices,default='OT')
-    tag=models.CharField(max_length=100)
-
-class out_scope(models.Model):
-    out_target=models.URLField(max_length=200)
-class rewards(models.Model):
-    p1_min=models.PositiveIntegerField(null=False,blank=False)
-    p1_max=models.PositiveIntegerField(null=False,blank=False)
-    p2_min=models.PositiveIntegerField(null=False,blank=False)
-    p2_max=models.PositiveIntegerField(null=False,blank=False)
-    p3_min=models.PositiveIntegerField(null=False,blank=False)
-    p3_max=models.PositiveIntegerField(null=False,blank=False)
-    p4_min=models.PositiveIntegerField(null=False,blank=False)
-    p4_max=models.PositiveIntegerField(null=False,blank=False)
-    p5_min=models.PositiveIntegerField(null=False,blank=False)
-    p5_max=models.PositiveIntegerField(null=False,blank=False)
-    max_reward=models.PositiveIntegerField(null=True,blank=True)
-
-
 class companyProgram(models.Model):
     company=models.ForeignKey(User, on_delete=models.CASCADE,)
     slug=models.SlugField(max_length=30)
@@ -95,12 +54,31 @@ class companyProgram(models.Model):
     vulnerability_concerns=models.TextField(max_length=1000,)
     region=models.CharField(max_length=3,default='all')
     visibility=models.CharField(max_length=1,choices=choices,default='G')
-    in_scope=models.ForeignKey(in_scope, on_delete=models.CASCADE,)
-    out_scope=models.ForeignKey(out_scope,on_delete=models.CASCADE,)
-    rewards=models.ForeignKey(rewards,on_delete=models.CASCADE,)
+    target=models.URLField(max_length=200,null = True,default="http://test.com")
+    scope_choices=[
+        ('WT','Website Testing'),
+        ('AT','API Testing'),
+        ('IS','iOS Application'),
+        ('AD','Android Application'),
+        ('IT','IoT Testing'),
+        ('HT','Hardware Testing'),
+        ('OT','Others')
+    ]
+    scope_type=models.CharField( max_length=2,choices=scope_choices,default='OT')
+    out_target=models.URLField(max_length=200,null=True,default="http://test.com")
+    p1_min=models.PositiveIntegerField(null=True,blank=False)
+    p1_max=models.PositiveIntegerField(null=True,blank=False)
+    p2_min=models.PositiveIntegerField(null=True,blank=False)
+    p2_max=models.PositiveIntegerField(null=True,blank=False)
+    p3_min=models.PositiveIntegerField(null=True,blank=False)
+    p3_max=models.PositiveIntegerField(null=True,blank=False)
+    p4_min=models.PositiveIntegerField(null=True,blank=False)
+    p4_max=models.PositiveIntegerField(null=True,blank=False)
+    p5_min=models.PositiveIntegerField(null=True,blank=False)
+    p5_max=models.PositiveIntegerField(null=True,blank=False)
+    max_reward=models.PositiveIntegerField(null=True,blank=True)
     posted=models.BooleanField(default=False)
-    creation_step=models.IntegerField(default=0)
-    created_at=models.DateField(auto_now_add=True)
+    created_at=models.DateField(auto_now=True)
     edited_at=models.DateField(auto_now=True)
 
 

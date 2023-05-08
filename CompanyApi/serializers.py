@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import companyProgram,submission,company,company_login_details,in_scope,rewards,out_scope,company_wallet_history
+from .models import companyProgram,submission,company,company_login_details,company_wallet_history
 from ProfessionalApi.models import professional
 from StudentApi.models import Student
 from MainApi.models import ExtendUser
@@ -17,12 +17,11 @@ import re
 
 class CompanyRegisterSerializer(serializers.ModelSerializer):
     confirm_password=serializers.CharField()
-    terms_and_policy=serializers.BooleanField(required=True)
     email=serializers.EmailField(required=True)
     # recaptcha = serializers.CharField(required=True)
     class Meta:
         model = User
-        fields=['first_name','last_name','username','email','password','confirm_password','terms_and_policy']
+        fields=['first_name','last_name','username','email','password','confirm_password']
         extra_kwargs = {
             'first_name': {'required': True},
             'last_name': {'required': True},
@@ -96,14 +95,9 @@ class ProgramSerializer(serializers.ModelSerializer):
     class Meta:
         model=companyProgram
         fields="__all__"
-
-class CompanyRewards(serializers.ModelSerializer):
-    class Meta:
-        model=rewards
-        fields="__all__"              
+            
 class CompanyProgramSerializer(serializers.ModelSerializer):
     company=UserSerializer(read_only=True)
-    rewards=CompanyRewards(read_only=True)
     class Meta:
         model=companyProgram
         fields="__all__"
@@ -158,45 +152,11 @@ class CompanyExtendedUserSerializer(serializers.ModelSerializer):
         fields="__all__"
 
 
-class CompanyCreateProgramSerializer(serializers.Serializer):
-    slug=serializers.SlugField(required=True)
-    title=serializers.CharField(required=True)
-    introduction=serializers.CharField(required=True)
-    vulnerability_concerns=serializers.CharField(required=True)
-    target=serializers.URLField()
-    out_target=serializers.URLField()
-    scope_type=serializers.ChoiceField(
-        choices=['WT','AT','IS','AD','IT','HT','OT'],required=True
-    )
-    visibility=serializers.ChoiceField(
-        choices=['G','R','P'],required=True
-    )
-    p1_min=serializers.IntegerField(required=True)
-    p1_max=serializers.IntegerField(required=True)
-    p2_min=serializers.IntegerField(required=True)
-    p2_max=serializers.IntegerField(required=True)
-    p3_min=serializers.IntegerField(required=True)
-    p3_max=serializers.IntegerField(required=True)
-    p4_min=serializers.IntegerField(required=True)
-    p4_max=serializers.IntegerField(required=True)
-    p5_min=serializers.IntegerField(required=True)
-    p5_max=serializers.IntegerField(required=True)
-    # max_reward=serializers.IntegerField()
-
-class CompanyCreateProgramInScopeSerializer(serializers.ModelSerializer):
+class CompanyCreateProgramSerializer(serializers.ModelSerializer):
     class Meta:
-        model=in_scope
-        fields=['target','scope_type']
+        model=companyProgram
+        fields=['slug','title','introduction','vulnerability_concerns','target','out_target','scope_type','visibility','p1_min','p1_max','p2_min','p2_max','p3_min','p3_max','p4_min','p4_max','p5_min','p5_max']
 
-class CompanyCreateProgramOutScopeSerializer(serializers.ModelSerializer):
-    class Meta:
-        model=out_scope
-        fields=['out_target']
-
-class CompanyCreateProgramRewardSerializer(serializers.ModelSerializer):
-    class Meta:
-        model=rewards
-        fields=['p1_min','p1_max','p2_min','p2_max','p3_min','p3_max','p4_min','p4_max','p5_min','p5_max']
 
 class CompanyCreateProgramSaveSerializer(serializers.ModelSerializer):
     class Meta:

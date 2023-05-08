@@ -14,9 +14,10 @@ def send_forget_password_mail(email,token,request):
     except Exception as e:
         return False
 
-def send_email_verification_mail(request,email,token):
+def send_email_verification_mail(email,token,request):
    
     try:
+        print(email)
         host = request.get_host()
         subject = 'Email verification'
         message = f'Hi , this is your verification token {host}/api/email_verification/{token}'

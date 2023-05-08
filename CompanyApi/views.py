@@ -1,7 +1,6 @@
-
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from .serializers import CompanyRegisterSerializer,CompanyProgramSerializer,CompanySubmissionSerializer,CompanyProfessionalLeaderBoardSerializer,CompanyStudentLeaderBoardSerializer,ComapnyImageUploadSerializer,CompanySettingsSerializer,CompanyLoginDetailsSerializer,CompanyExtendedUserSerializer,CompanyCreateProgramSerializer,CompanyCreateProgramInScopeSerializer,CompanyCreateProgramRewardSerializer,CompanyCreateProgramSaveSerializer,CompanyCreateProgramOutScopeSerializer
+from .serializers import CompanyRegisterSerializer,CompanyProgramSerializer,CompanySubmissionSerializer,CompanyProfessionalLeaderBoardSerializer,CompanyStudentLeaderBoardSerializer,ComapnyImageUploadSerializer,CompanySettingsSerializer,CompanyLoginDetailsSerializer,CompanyExtendedUserSerializer,CompanyCreateProgramSerializer,CompanyCreateProgramSaveSerializer
 from .serializers import CompanyChangeNameSerializer,CompanyChangeUserNameSerializer,CompanyUpdatePasswordSerializer,CompanyWalletHistory
 from .models import company,companyProgram,submission,payments,company_login_details,company_wallet,company_wallet_history
 from django.contrib.auth.models import User
@@ -51,7 +50,7 @@ class CompanyRegisterAPIView(APIView):
                 message='Account created Successfully ! verify your email'
             else:
                 message='Account not created retry again'
-            return Response({"token":token,"message":message})
+            return Response({"message":message})
             
         else:
             print("elsereached")
@@ -125,89 +124,60 @@ class CompanyProgramAPIView(APIView):
         if verify == True:
             serializer=CompanyCreateProgramSerializer(data=request.data)
             if serializer.is_valid(raise_exception=True):
-                slug=request.data['slug']
-                title=request.data['title']
-                introduction=request.data['introduction']
-                vulnerability_concerns= request.data['vulnerability_concerns']
-                target=request.data['target']
-                scope_type=request.data['scope_type']
-                out_scope_target=request.data['out_target']
-                visibility=request.data['visibility']
-                p1_min=int(request.data['p1_min'])
-                p1_max=int(request.data['p1_max'])
-                p2_min=int(request.data['p2_min'])
-                p2_max=int(request.data['p2_max'])
-                p3_min=int(request.data['p3_min'])
-                p3_max=int(request.data['p3_max'])
-                p4_min=int(request.data['p4_min'])
-                p4_max=int(request.data['p4_max'])
-                p5_min=int(request.data['p5_min'])
-                p5_max=int(request.data['p5_max'])
-                try:
-                    max_reward=request.data['max_reward']
-                except:
-                    max_reward=None
-                    pass
-                if not max_reward:
-                    if not p1_min>0 or not p1_max>0 or not p2_min>0 or not p2_max>0 or not p3_min>0 or not p3_max>0 or not p4_min>0 or not p4_max>0 or not p5_min>0 or not p5_max >0:
-                        return Response({"message":"Rewards should be positive"})
-                    reward_list=[p1_min,p1_max,p2_min,p2_max,p3_min,p3_max,p4_min,p4_max,p5_min,p5_max]
-                else:
-                    if not p1_min > 0 or not p1_max > 0 or not p2_min > 0 or not p2_max > 0 or not p3_min > 0 or not p3_max > 0 or not p4_min > 0 or not p4_max > 0 or not p5_min > 0 or not p5_max > 0 or not int(max_reward) > 0:
-                        return Response({"message":"Rewards should be positive"})
-                    reward_list=[p1_min,p1_max,p2_min,p2_max,p3_min,p3_max,p4_min,p4_max,p5_min,p5_max,int(max_reward)]
-                reward_list_copy=reward_list[:]
-                reward_list_copy.sort()
-                if reward_list != reward_list_copy:
-                    return Response({"message":'The reward should be in increasing order'})
-
-                in_scope=CompanyCreateProgramInScopeSerializer(data=request.data)
-                reward=CompanyCreateProgramRewardSerializer(data=request.data)
-                
-                out_scope=CompanyCreateProgramOutScopeSerializer(data=request.data)
-                
-
-                if in_scope.is_valid(raise_exception=True) and out_scope.is_valid(raise_exception=True):
-                    if reward.is_valid(raise_exception=True):
-                        if  not max_reward: 
-                            max_reward=None
-                        reward.max_reward = max_reward
-                    else:
-                        return Response({"message":'Something went wrong with reward'})
-                    
-                    program=CompanyCreateProgramSaveSerializer(data=request.data)
-                    if program.is_valid(raise_exception=True):
-                        try:
-                            visibility=request.data['visibility']
-                        except:
-                            visibility="G"                    
-                        if visibility == "R":
-                            region=request.data['region']
-                        else:
-                            region='all'
-                        print(request.user)
-                        program.company=request.user
-                        program.in_scope=in_scope.save()
-                        program.out_scope=out_scope.save()
-                        program.rewards=reward.save()
-                        program.region=region
-                        program.save()
-                        message="Program created successfully"
-                    else:
-                        message='Something went wrong creating program'
-                    
-                else:
-                    return Response({"message":'Something went wrong with in_scope or out_scope'})
-              
+                program_obj=serializer.save(company=request.user)
+                # program_obj.company=request.user
+                # program_obj.save()
+                message="Program created successfully"
             else:
-                message='Something went wrong creating program'
+                message="Something went wrong , Retry later"
+            # if serializer.is_valid(raise_exception=True):
+            #     slug=request.data['slug']
+            #     title=request.data['title']
+            #     introduction=request.data['introduction']
+            #     vulnerability_concerns= request.data['vulnerability_concerns']
+            #     target=request.data['target']
+            #     scope_type=request.data['scope_type']
+            #     out_scope_target=request.data['out_target']
+            #     visibility=request.data['visibility']
+            #     p1_min=int(request.data['p1_min'])
+            #     p1_max=int(request.data['p1_max'])
+            #     p2_min=int(request.data['p2_min'])
+            #     p2_max=int(request.data['p2_max'])
+            #     p3_min=int(request.data['p3_min'])
+            #     p3_max=int(request.data['p3_max'])
+            #     p4_min=int(request.data['p4_min'])
+            #     p4_max=int(request.data['p4_max'])
+            #     p5_min=int(request.data['p5_min'])
+            #     p5_max=int(request.data['p5_max'])
+            #     print("slug",slug,"title",title,"introduction",introduction,"vulnerability_concerns",vulnerability_concerns,"target",target,"scope_type",scope_type,"out_scope_target",out_scope_target)
+            #     try:
+            #         max_reward=request.data['max_reward']
+            #     except:
+            #         max_reward=None
+            #         pass
+            #     if not max_reward:
+            #         if not p1_min>0 or not p1_max>0 or not p2_min>0 or not p2_max>0 or not p3_min>0 or not p3_max>0 or not p4_min>0 or not p4_max>0 or not p5_min>0 or not p5_max >0:
+            #             return Response({"message":"Rewards should be positive"})
+            #         reward_list=[p1_min,p1_max,p2_min,p2_max,p3_min,p3_max,p4_min,p4_max,p5_min,p5_max]
+            #     else:
+            #         if not p1_min > 0 or not p1_max > 0 or not p2_min > 0 or not p2_max > 0 or not p3_min > 0 or not p3_max > 0 or not p4_min > 0 or not p4_max > 0 or not p5_min > 0 or not p5_max > 0 or not int(max_reward) > 0:
+            #             return Response({"message":"Rewards should be positive"})
+            #         reward_list=[p1_min,p1_max,p2_min,p2_max,p3_min,p3_max,p4_min,p4_max,p5_min,p5_max,int(max_reward)]
+            #     reward_list_copy=reward_list[:]
+            #     reward_list_copy.sort()
+            #     if reward_list != reward_list_copy:
+            #         return Response({"message":'The reward should be in increasing order'})
+
+              
+            # else:
+            #     message='Something went wrong creating program'
         else:
-            message.error(request,"reCAPTCHA not verifyied")
+            message="reCAPTCHA not verifyied"
             
             # print(title,slug,introduction,vulnerability_concerns,target,scope_type,out_scope_target,visibility,p1_min,p1_max,p2_min,p2_max,p3_min,p3_max,p4_min,p4_max,p5_min,p5_max)
         response={
             "message":message,
-            "data":None
+            
         }
         return Response(response)
 

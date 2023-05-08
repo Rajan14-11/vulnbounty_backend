@@ -24,6 +24,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth.hashers import make_password
 # Create your views here.
+
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
 
@@ -35,6 +36,7 @@ def get_tokens_for_user(user):
 class ProfessionalRegisterAPIView(APIView):
      renderer_classes=[UserRender]
      def post(self,request,format=None):
+        
         serializer=ProfessionalRegisterSdrializer(data=request.data)
         if serializer.is_valid(raise_exception=True):
             email_token = str(uuid.uuid4())

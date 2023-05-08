@@ -47,3 +47,11 @@ class PhoneValidation(serializers.ModelSerializer):
     class Meta:
         model=ValidateNumber
         fields=["code","status","phone_number"]
+
+class ForgotPasswordSerializer(serializers.Serializer):
+    username=serializers.CharField()
+
+class ChangePasswordSerializer(serializers.Serializer):
+    password=serializers.CharField(required=True)
+    confirm_password=serializers.CharField(required=True)
+    token=serializers.CharField(required=True)
