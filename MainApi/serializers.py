@@ -26,16 +26,7 @@ class LoginSerializer(serializers.Serializer):
                 raise serializers.ValidationError("Username and Password doesn't match")
         else:
             raise serializers.ValidationError("Must include username and password")
-    def validate_username(self,username):
-        if not username:
-            raise serializers.ValidationError("Username  is required.")
-        else:
-            return username
-    def validate_password(self,password):
-        if not password:
-            raise serializers.ValidationError("Password is required.")
-        else:
-            return password
+    
    
     
 
@@ -49,7 +40,7 @@ class PhoneValidation(serializers.ModelSerializer):
         fields=["code","status","phone_number"]
 
 class ForgotPasswordSerializer(serializers.Serializer):
-    username=serializers.CharField()
+    email=serializers.EmailField()
 
 class ChangePasswordSerializer(serializers.Serializer):
     password=serializers.CharField(required=True)

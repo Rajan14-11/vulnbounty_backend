@@ -25,7 +25,7 @@ from django.contrib import messages as message
 # from ExtendUserApi.models import ExtendUser,ValidateNumber
 from django.contrib.auth import authenticate, login, logout
 import uuid
-import os 
+import os
 from django.core.files.base import ContentFile
 # from CompanyApi.forms import *
 from django.contrib import messages as message
@@ -38,8 +38,11 @@ import re
 from django.db.models import Q
 from twilio.rest import Client
 from django.core.files.base import ContentFile
-import base64, secrets
-from StudentApi.helpers import send_email_verification_mail,send_optional_email_verification_mail
+import base64
+import secrets
+from StudentApi.helpers import send_email_verification_mail, send_optional_email_verification_mail
+from MainApi.helpers import error_handle
+
 import uuid
 from .serializers import *
 
@@ -53,6 +56,8 @@ from .renderers import UserRender
 from rest_framework.permissions import IsAuthenticated
 # Create your views here.
  # --------------------- DASHBOARD ------------------------------
+
+
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
 
@@ -61,26 +66,32 @@ def get_tokens_for_user(user):
         'access': str(refresh.access_token),
     }
 
+
 class StudentRegisterAPIView(APIView):
-    renderer_classes=[UserRender]
-    def post(self,request,format=None):
-        serializer=StudentRegisterSdrializer(data=request.data)
-        if serializer.is_valid(raise_exception=True):
+    renderer_classes = [UserRender]
+
+    def post(self, request, format=None):
+        serializer = StudentRegisterSdrializer(data=request.data)
+        if serializer.is_valid():
             email_token = str(uuid.uuid4())
-            user=serializer.save()
-            student_obj = Student.objects.create(student_user=user,email_verification_token=email_token,terms_and_policy=True)
-            token=get_tokens_for_user(user)
+            user = serializer.save()
+            student_obj = Student.objects.create(
+                student_user=user, email_verification_token=email_token, terms_and_policy=True)
+            token = get_tokens_for_user(user)
             if student_obj:
                 student_wallet.objects.create(student=student_obj)
-                send_email_verification_mail(request,user.email,email_token )
-                message='Account created Successfully ! verify your email'
+                send_email_verification_mail(request, user.email, email_token)
+                message = 'Account created Successfully ! verify your email'
             else:
-                message='Account not created retry again'
-            return Response({"token":token,"message":message})
-            
+                message = 'Account not created retry again'
+            return Response({"token": token, "message": message})
+
         else:
-            print("elsereached")
-            return Response({"message":"Try again later"})  
+            message = error_handle(serializer.errors)
+            print("message",message)
+            
+
+            return Response(message)  
 
 
 class StudentDashboardAPIView(APIView):
@@ -167,7 +178,7 @@ class StudentSubmissionAPIView(APIView):
         return Response(response)
     def post(self,request):
         serializer=StudentprogramSubmissionSerializer(data=request.data)
-        if  serializer.is_valid(raise_exception=True):
+        if  serializer.is_valid():
             program_obj=companyProgram.objects.get(id=serializer.data['program_id'])
             if submission.objects.filter(program=program_obj,user=request.user).exists():
                 return Response({"message":"already done"})
@@ -179,9 +190,9 @@ class StudentSubmissionAPIView(APIView):
                 user=request.user)
                 message="success"
         else:
-            message="failed"
-       
-        return Response({"message":message})
+            message=error_handle(serializer.errors)
+            print("message",message)
+            return Response(message)
 
 
 class StudentSubmissionDetailsAPIView(APIView):
@@ -295,7 +306,7 @@ class StudentSettingNameDescriptionAPIView(APIView):
     permission_classes=[IsAuthenticated]
     def post(self,request,format=None):
         serializer=StudentChangeNameSerialzer(data=request.data)
-        if serializer.is_valid(raise_exception=True):
+        if serializer.is_valid():
             try:
                 first_name=request.data['first_name']
                 last_name=request.data['last_name']
@@ -310,7 +321,11 @@ class StudentSettingNameDescriptionAPIView(APIView):
                 message="Failed"
                 print(e)
         else:
-            message="Retry once again"
+            message=error_handle(serializer.errors)
+            print("message",message)
+            
+
+            return Response(message)
 
         response={
             "message":message
@@ -345,7 +360,7 @@ class StudentSettingsUserEmailAPIView(APIView):
     def post(self,request,format=None):
         serializer=StudentChangeUserNameSerializer(data=request.data)
         message=[]
-        if serializer.is_valid(raise_exception=True):
+        if serializer.is_valid():
             try:
                 regex  = "^([a-z]+('[a-z])?[0-9a-z]*)$"
                 print("reached_up")
@@ -409,10 +424,9 @@ class StudentSettingsUserEmailAPIView(APIView):
             }
             
         else:
-            response={
-                "message":"something went wrong",
-                "data":None
-            }
+            message=error_handle(serializer.errors)
+            print("message",message)
+            return Response(message)
         
         return Response(response)
 
@@ -422,7 +436,7 @@ class StudentSettingsUpdatePasswordAPIView(APIView):
     permission_classes=[IsAuthenticated]
     def post(self,request,format=None):
         serializer=StudentUpdatePasswordSerializer(data=request.data)
-        if serializer.is_valid(raise_exception=True):
+        if serializer.is_valid():
             password_1=request.data['password1']
             password_2=request.data['password2']
             password_3=request.data['password3']
@@ -446,9 +460,9 @@ class StudentSettingsUpdatePasswordAPIView(APIView):
 
             print('if')
         else:
-            message="failed"
-            print('else')
-        
+            message=error_handle(serializer.errors)
+            print("message",message)
+            return Response(message)
         response={
             "data":None,
             "message":message
@@ -477,7 +491,7 @@ class StudentSettingsSkillsAPIView(APIView):
         return Response(response)
     def post(self,request,format=None):
         serializer=StudentSkillsAddSerializer(data=request.data)
-        if serializer.is_valid(raise_exception=True):
+        if serializer.is_valid():
             print("reached")
             profe_user=Student.objects.get(student_user=request.user.id)
             skill=request.data['skill']
@@ -495,7 +509,11 @@ class StudentSettingsSkillsAPIView(APIView):
             else:
                 skills.objects.create(user=profe_user,skill=skill)
                 message="Skill added successfully"
-                return Response({"message":message})      
+                return Response({"message":message})  
+        else:
+            message=error_handle(serializer.errors)
+            print("message",message)
+            return Response(message)    
 
 
 class StudentFavouriteListAPIView(APIView):
@@ -567,6 +585,10 @@ class Submit_program_view(APIView):
         serializers_data=serializers.data
         if serializers.is_valid():
             serializers.save()
+        else:
+            message=error_handle(serializers.errors)
+            print("message",message)
+            return Response(message)
         return Response({"message":"progem submitted successfully !"})
                 
 

@@ -43,3 +43,12 @@ def send_optional_email_verification_mail(request,email,token):
     except Exception as e:
         print(e)
         return False
+
+def error_handle(error):
+
+    error_message=[]
+    for field_name, field_errors in error.items():
+        print(field_errors[0])
+        error_message.append(field_errors[0])
+    print("error",error)
+    return error_message

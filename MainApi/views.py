@@ -13,7 +13,7 @@ from .models import ExtendUser,ValidateNumber
 from twilio.rest import Client
 from .renderers import UserRender
 import uuid
-from .helpers import send_forget_password_mail,send_email_verification_mail
+from .helpers import send_forget_password_mail,send_email_verification_mail,error_handle
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password
 def get_tokens_for_user(user):
@@ -86,7 +86,8 @@ class LoginAPIView(APIView):
         h_name = socket.gethostname()
         IP_addres = socket.gethostbyname(h_name)
         serializer =LoginSerializer(data=request.data)
-        if serializer.is_valid(raise_exception=True):
+        if serializer.is_valid():
+            print("error",serializer.errors)
             print("reached in valid")
             username = serializer.data['username']
             password = serializer.data['password']
@@ -135,15 +136,39 @@ class LoginAPIView(APIView):
                         
                 else:
                     message="No User found"
-        else:
-            message="Try Again Later"
-          
-        response={
+            response={
             "token":token,
             "message":message,
             "role":role
                 }
-        return Response(response)
+            return Response(response)
+        else:
+            # default_errors=serializer.errors
+            message=error_handle(serializer.errors)
+            print("message",message)
+            
+
+            return Response(message)
+        
+            # field_names = []
+            # error_message=[]
+            # for field_name, field_errors in default_errors.items():
+            #     field_names.append(field_name)
+            # for errors in default_errors.items():
+
+            #     error_message.append((errors[1]))
+            # print("error_message",error_message)
+            # print("errors",default_errors.items())
+            # return Response({'error': f'{field_names} is required'})
+
+
+            message="Try Again Later"
+            response={
+            "message":message,
+                }
+            return Response(response)
+          
+        
 
         # try:
         #     client_key=request.POST.get('g-recaptcha-response')
@@ -244,7 +269,7 @@ class PhoneValidateAPIView(APIView):
     def post(self,request,format=None):
         serializer=ValidatePhoneSerializer(data=request.data)
         message=""
-        if serializer.is_valid(raise_exception=True):
+        if serializer.is_valid():
             country=request.data['country_code']
             phone_number=request.data['phone_number']
             code=request.data['code']
@@ -288,26 +313,20 @@ class PhoneValidateAPIView(APIView):
                     except Exception as e:
                         print(e)
                         message="Something went Wrong retry again"
-            response={
-                "message":message
-            }
         else:
-             response={
-                "message":message
-            }
-        return Response(response)
+             message=error_handle(serializer.errors)
+        return Response(message)
 
 class ForgotPasswordAPIView(APIView):
     renderer_classes=[UserRender]
     def post(self,request):
         serializer=ForgotPasswordSerializer(data=request.data)
         message=""
-        if serializer.is_valid(raise_exception=True):
-            username=request.data['username']
-            print(username)
-            if not User.objects.filter(username = username).first():
+        if serializer.is_valid():
+            email=request.data['email']
+            if not User.objects.filter(email =email).first():
                 message="you will get reset password if you registered with this username"
-            user_obj = User.objects.get(username=username)
+            user_obj = User.objects.get(email=email)
             token = str(uuid.uuid4())
             if Student.objects.filter(student_user=user_obj.id).exists():
                 student_data=Student.objects.get(student_user=user_obj.id)
@@ -327,17 +346,20 @@ class ForgotPasswordAPIView(APIView):
                 company_data.save()
                 send_forget_password_mail(user_obj.email,token,request)
                 message="you will get reset password if you registered with this username"
-                
-        response={
+            response={
             "message":message
         }
-        return Response(response)
+            return Response(response)
+        else:
+            message=error_handle(serializer.errors)  
+            return Response(message)
+   
     
 class ChangePasswordAPIView(APIView):
     renderer_classes=[UserRender]
     def post(self,request):
         serializer=ChangePasswordSerializer(data=request.data)
-        if serializer.is_valid(raise_exception=True):
+        if serializer.is_valid():
             token=request.data['token']
             if Student.objects.filter(forget_password_token=token).exists():
                 student_obj =Student.objects.filter(forget_password_token=token).first()
@@ -356,12 +378,15 @@ class ChangePasswordAPIView(APIView):
                 message="New password updated successfully"
             else:
                 message="New password and confirm password not match"
-        else:
-            message="Retry again"
-        response={
+            response={
             "message":message
         }
-        return Response(response)
+            return Response(response)
+        else:
+            message=error_handle(serializer.errors)
+            return Response(message)
+
+        
     
 
 class EmailVerificationAPIView(APIView):
@@ -369,12 +394,11 @@ class EmailVerificationAPIView(APIView):
     def post(self,request):
         serializer=ForgotPasswordSerializer(data=request.data)
         message=""
-        if serializer.is_valid(raise_exception=True):
-            username=request.data['username']
-            print(username)
-            if not User.objects.filter(username = username).first():
+        if serializer.is_valid():
+            email=request.data['email']
+            if not User.objects.filter(email = email).first():
                 message="you will get email verification if you registered with this username "
-            user_obj = User.objects.get(username=username)
+            user_obj = User.objects.get(email=email)
             token = str(uuid.uuid4())
             if Student.objects.filter(student_user=user_obj.id).exists():
                 student_data=Student.objects.get(student_user=user_obj.id)
@@ -382,12 +406,14 @@ class EmailVerificationAPIView(APIView):
                 student_data.save()
                 send_email_verification_mail(user_obj.email,token,request)
                 message="you will get email verification if you registered with this username "
+                
             if professional.objects.filter(professional_user=user_obj.id).exists():
                 professional_data = professional.objects.get(professional_user = user_obj.id)
                 professional_data.email_verification_token = token
                 professional_data.save()
                 send_email_verification_mail(user_obj.email,token,request)
                 message="you will get email verification if you registered with this username "
+                
             if company.objects.filter(company_user=user_obj.id).exists():
                 company_data = company.objects.get(company_user = user_obj.id)
                 company_data.email_verification_token = token
@@ -395,10 +421,14 @@ class EmailVerificationAPIView(APIView):
                 send_email_verification_mail(user_obj.email,token,request)
                 message="you will get email verification if you registered with this username "
                 
-        response={
+            response={
             "message":message
         }
-        return Response(response)
+            return Response(response)
+        else:
+            message=error_handle(serializer.errors)
+            return Response(message)        
+        
     
 class Logout(APIView):
     def get(self,request):

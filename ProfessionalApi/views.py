@@ -10,7 +10,7 @@ from django.contrib.auth import authenticate, login, logout
 import re
 import uuid
 from MainApi.models import ExtendUser,ValidateNumber
-from .helpers import send_email_verification_mail,send_optional_email_verification_mail
+from .helpers import send_email_verification_mail,send_optional_email_verification_mail,error_handle
 import os
 from twilio.rest import Client
 from django.conf import settings
@@ -38,7 +38,7 @@ class ProfessionalRegisterAPIView(APIView):
      def post(self,request,format=None):
         
         serializer=ProfessionalRegisterSdrializer(data=request.data)
-        if serializer.is_valid(raise_exception=True):
+        if serializer.is_valid():
             email_token = str(uuid.uuid4())
             user=serializer.save()
             professional_obj = professional.objects.create(professional_user=user,email_verification_token=email_token,terms_and_policy=True)
@@ -52,8 +52,8 @@ class ProfessionalRegisterAPIView(APIView):
             return Response({"token":token,"message":message})
             
         else:
-            print("elsereached")
-            return Response({"message":"Try again later"})  
+            message=error_handle(serializer.errors)
+            return Response(message)  
 
 class ProfessionalDashboardAPIView(APIView):
     renderer_classes=[UserRender]
@@ -142,7 +142,7 @@ class ProfessionalSubmissionAPIView(APIView):
         return Response(response)
     def post(self,request):
         serializer=ProfessionalprogramSubmissionSerializer(data=request.data)
-        if  serializer.is_valid(raise_exception=True):
+        if  serializer.is_valid():
             program_obj=companyProgram.objects.get(id=serializer.data['program_id'])
             if submission.objects.filter(program=program_obj,user=request.user).exists():
                 return Response({"message":"already done"})
@@ -153,10 +153,12 @@ class ProfessionalSubmissionAPIView(APIView):
                 program=program_obj,
                 user=request.user)
                 message="success"
+            return Response({"message":message})
         else:
-            message="failed"
+            message=error_handle(serializer.errors)
+            return Response(message)  
        
-        return Response({"message":message})
+        
 
 class ProfessionalSubmissionDetailsAPIView(APIView):
     renderer_classes=[UserRender]
@@ -270,7 +272,7 @@ class ProfessionalSettingsNameDescriptionAPIView(APIView):
     permission_classes=[IsAuthenticated]
     def post(self,request,format=None):
         serializer=ProfessionalChangeNameSerialzer(data=request.data)
-        if serializer.is_valid(raise_exception=True):
+        if serializer.is_valid():
             try:
                 first_name=request.data['first_name']
                 last_name=request.data['last_name']
@@ -284,13 +286,15 @@ class ProfessionalSettingsNameDescriptionAPIView(APIView):
             except Exception as e:
                 message="Failed"
                 print(e)
-        else:
-            message="Retry once again"
-
-        response={
+            response={
             "message":message
-        }
-        return Response(response)
+            }
+            return Response(response)
+        else:
+            message=error_handle(serializer.errors)
+            return Response(message)  
+
+        
 
 
 class ProfessionalSettingsUserEmailAPIView(APIView):
@@ -299,7 +303,7 @@ class ProfessionalSettingsUserEmailAPIView(APIView):
     def post(self,request,format=None):
         serializer=ProfessionalChangeUserNameSerializer(data=request.data)
         message=[]
-        if serializer.is_valid(raise_exception=True):
+        if serializer.is_valid():
             try:
                 regex  = "^([a-z]+('[a-z])?[0-9a-z]*)$"
                 print("reached_up")
@@ -361,14 +365,13 @@ class ProfessionalSettingsUserEmailAPIView(APIView):
                 "message":message,
                 "data":None
             }
+            return Response(response)
             
         else:
-            response={
-                "message":"something went wrong",
-                "data":None
-            }
+            message=error_handle(serializer.errors)
+            return Response(message)  
         
-        return Response(response)
+        
 
 
 
@@ -377,7 +380,7 @@ class ProfessionalSettingsUpdatePasswordAPIView(APIView):
     permission_classes=[IsAuthenticated]
     def post(self,request,format=None):
         serializer=ProfessionalUpdatePasswordSerializer(data=request.data)
-        if serializer.is_valid(raise_exception=True):
+        if serializer.is_valid():
             password_1=request.data['password1']
             password_2=request.data['password2']
             password_3=request.data['password3']
@@ -400,15 +403,18 @@ class ProfessionalSettingsUpdatePasswordAPIView(APIView):
                 message="Old password not match"
 
             print('if')
-        else:
-            message="failed"
-            print('else')
-        
-        response={
+            response={
             "data":None,
             "message":message
         }
-        return Response(response)
+            return Response(response)
+        else:
+            message=error_handle(serializer.errors)
+            return Response(message)  
+        
+        
+       
+        
 
 
 class ProfessionalSettingsSkillsAPIView(APIView):
@@ -433,7 +439,7 @@ class ProfessionalSettingsSkillsAPIView(APIView):
         return Response(response)
     def post(self,request,format=None):
         serializer=ProfessionalSkillsAddSerializer(data=request.data)
-        if serializer.is_valid(raise_exception=True):
+        if serializer.is_valid():
             print("reached")
             profe_user=professional.objects.get(professional_user=request.user.id)
             skill=request.data['skill']
@@ -451,7 +457,10 @@ class ProfessionalSettingsSkillsAPIView(APIView):
             else:
                 professional_skills.objects.create(user=profe_user,skill=skill)
                 message="Skill added successfully"
-                return Response({"message":message})      
+                return Response({"message":message})    
+        else:
+            message=error_handle(serializer.errors)
+            return Response(message)    
 
 
 class ProfessionalDeleteSkillAPIView(APIView):
@@ -483,19 +492,28 @@ class ProfessionalSettingsUploadPictureAPIView(APIView):
     def post(self,request,format=None):
         data = professional.objects.get( professional_user=request.user.id)
         serializer =ProfessionalUpdateimageSerializer(data ,data=request.data,partial=True)
-        if serializer.is_valid(raise_exception=True):
-            if data.profile_picture == 'Null':
-                serializer.save()
+        if serializer.is_valid():
+            try:
+                profile_image=request.POST.get('profile_image')
+                _format, _dataurl =profile_image.split(';base64,')
+                _filename, _extension   = secrets.token_hex(20), _format.split('/')[-1]
+                file = ContentFile( base64.b64decode(_dataurl), name=f"{_filename}.{_extension}")
+                if data.profile_picture == 'Null':
+                    serializer.save()
+                    message="Successfully updated !"
+                else:
+                    file_exists=os.path.exists(data.profile_picture.path)
+                    if file_exists == True:
+                        os.remove(data.profile_picture.path)
+                    serializer.save()
                 message="Successfully updated !"
-            else:
-                file_exists=os.path.exists(data.profile_picture.path)
-                if file_exists == True:
-                    os.remove(data.profile_picture.path)
-                serializer.save()
-            message="Successfully updated !"
-            return Response({"message":message})
+                return Response({"message":message})
+            except:
+                return Response({"message":"Failed"})
+
         else:
-            return Response({"message":"Failed"})
+            message=error_handle(serializer.errors)
+            return Response(message)  
 
 
        
@@ -527,7 +545,7 @@ class ProfessionalSettingsUploadResumeAPIView(APIView):
     def post(self,request,format=None):
         data = professional.objects.get( professional_user=request.user.id)
         serializer =ProfessionalUpdateResumeSerializer(data ,data=request.data,partial=True)
-        if serializer.is_valid(raise_exception=True):
+        if serializer.is_valid():
             if data.resume == 'Null':
                 serializer.save()
                 message="Successfully updated... !"
@@ -539,7 +557,8 @@ class ProfessionalSettingsUploadResumeAPIView(APIView):
             message="Successfully updated... !"
             return Response({"message":message})
         else:
-            return Response({"message":"Failed"})
+            message=error_handle(serializer.errors)
+            return Response(message)  
             
 class ProfessionalFavouriteListAPIView(APIView):
     renderer_classes=[UserRender]
@@ -607,12 +626,14 @@ class ProfessionalInformationAPIView(APIView):
     def post(self,request,format=None):
         professional_obj=professional.objects.get(professional_user=request.user.id)
         serializer=professionalInformationSerializer(data=request.data)
-        if serializer.is_valid(raise_exception=True):
+        if serializer.is_valid():
             professional_information.objects.create(status=True,professional=professional_obj,country_names=serializer.data['country_names'])
             message="success"
+            return Response({"message":message})
         else:
-            message="failed"
-        return Response({"message":message})
+            message=error_handle(serializer.errors)
+            return Response(message)  
+        
 class ProfessionalPaymentAPIView(APIView):
     renderer_classes=[UserRender]
     permission_classes=[IsAuthenticated]
@@ -620,7 +641,7 @@ class ProfessionalPaymentAPIView(APIView):
         print("reached")
         professional_data=professional.objects.get(professional_user=request.user.id)
         serializer = ProfessionalPaymentSerializer(data=request.data)
-        if serializer.is_valid(raise_exception=True):
+        if serializer.is_valid():
             wallet_object=professional_wallet.objects.get(professional=professional_data)
             amount=serializer.data['withdraw_amount']
             if wallet_object.amount > amount:
@@ -629,9 +650,10 @@ class ProfessionalPaymentAPIView(APIView):
                 message="success"
             else:
                 message="Don't have enough wallet balance"
+            return Response({"message":message})
         else:
-            message="failed"
-        return Response({"message":message})
+            message=error_handle(serializer.errors)
+            return Response(message)  
 # class ProfessionalSettingsOptionalEmailAPIView(APIView):
 #     def post(self,request,format=None):
 #         user=User.objects.get(id=2)
