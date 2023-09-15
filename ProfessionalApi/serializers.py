@@ -201,3 +201,7 @@ class professionalInformationSerializer(serializers.ModelSerializer):
 
 class ProfessionalPaymentSerializer(serializers.Serializer):
     withdraw_amount = serializers.IntegerField(required=True)
+class ProfessionalTestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model=professional_test
+        fields=['question','answer']

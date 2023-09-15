@@ -24,5 +24,7 @@ urlpatterns = [
     path('favourite/<int:pk>',views.PrefessionalFavouritePorgramAPIView.as_view()),
     path('information/',views.ProfessionalInformationAPIView.as_view()),
     path('withdraw/',views.ProfessionalPaymentAPIView.as_view()),
+    path('test',views.ProfessionalTestAPIView.as_view()),
+    path('test_update',views.ProfessionalTestUpdateAPIView.as_view()),
 
 ]

@@ -4,7 +4,7 @@ from django.core.validators import validate_image_file_extension
 from django.core.validators import FileExtensionValidator
 from django.conf import settings
 # from ProfessionalApi.models import professional
-
+# from ProfessionalApi.models import professional
 class company(models.Model):
     company_user=models.ForeignKey(User,on_delete=models.CASCADE,default="")
     company_name=models.CharField(max_length=100, null=True)

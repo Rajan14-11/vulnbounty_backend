@@ -27,6 +27,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
 from MainApi.serializers import PhoneValidation
 from .decorators import allowed_users
+from ProfessionalApi.models import private_invitation
 # Geneerate Token Manually
 
 
@@ -646,5 +647,27 @@ class CompanyWalletHistoryApIView(APIView):
             "data": {
                 "companyWallet": CompanyWalletHistory(wallet_obj, many=True).data
             }
+        }
+        return Response(response)
+    
+class CompanyPrivateInvitationAPIView(APIView):
+    renderer_classes = [UserRender]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request,pk1,pk2, format=None):
+        try:
+            # if private_invitation.objects.filter()
+            #pk1-> hunter id
+            #pk2 -> program id
+            program=companyProgram.objects.get(company=request.user,id=pk2)
+            hunter= professional.objects.get(professional_user=pk1)
+            private_invitation.objects.create(program=program,hunter=hunter)
+            response = {
+            "message":"success"
+        }
+        except:
+             response = {
+            "message":"failed"
+
         }
         return Response(response)

@@ -19,13 +19,17 @@ class professional(models.Model):
     interst=models.CharField(max_length=40,null = True)
     terms_and_policy=models.BooleanField(default=False)
     visibility=models.BooleanField(default=True)
+    test_status=models.BooleanField(default=False,null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
 class professional_skills(models.Model):
     user=models.ForeignKey(professional,on_delete=models.CASCADE)
     skill=models.CharField(max_length=40,)
-
+class private_invitation(models.Model):
+    program=models.ForeignKey(companyProgram,on_delete=models.CASCADE)
+    hunter=models.ForeignKey(professional, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
 class professional_socialmedia(models.Model):
     user=models.ForeignKey(User,on_delete=models.CASCADE)
     title=models.CharField(max_length=30)
@@ -64,4 +68,8 @@ class professional_login_details(models.Model):
 class professional_favourite_program(models.Model):
     professional = models.ForeignKey(professional,on_delete=models.CASCADE)
     program_id =models.ForeignKey(companyProgram,on_delete=models.CASCADE)
+    
+class professional_test(models.Model):
+    question=models.TextField()
+    answer=models.TextField()
 

@@ -653,7 +653,26 @@ class ProfessionalPaymentAPIView(APIView):
             return Response({"message":message})
         else:
             message=error_handle(serializer.errors)
-            return Response(message)  
+            return Response(message) 
+         
+class ProfessionalTestAPIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
+    def get(self, request,*args,**kwargs):
+        test_obj=professional_test.objects.all()
+        response={
+            "data":ProfessionalTestSerializer(test_obj,many=True).data,
+            "message":"success"
+        }
+        return Response(response)
+    
+class ProfessionalTestUpdateAPIView(APIView):
+    renderer_classes=[UserRender]
+    permission_classes=[IsAuthenticated]
+    def get(self, request):
+        professional.objects.filter(professional_user=request.user).update(test_status=True)
+        return Response({"message":"success"})
+    
 # class ProfessionalSettingsOptionalEmailAPIView(APIView):
 #     def post(self,request,format=None):
 #         user=User.objects.get(id=2)
