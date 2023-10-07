@@ -43,7 +43,7 @@ SECRET_KEY = 'django-insecure-lpq$)_!^c5)*$kfu#3p@=s7@kj=v_g11v=rc3r1)xhgmkx&!hq
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-# ALLOWED_HOSTS = ['localhost','sarathejohn.pythonanywhere.com']
+ALLOWED_HOSTS = ['localhost','*','3.111.40.102']
 
 
 # Application definition
@@ -112,16 +112,16 @@ DATABASES = {
 
 REST_FRAMEWORK = {
     "NON_FIELD_ERRORS_KEY":"error",
-   
+
     'DEFAULT_AUTHENTICATION_CLASSES': (
-      
+
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ), 
+    ),
     # 'DEFAULT_RENDERER_CLASSES': [
     #     'rest_framework.renderers.JSONRenderer',
     #     'rest_framework.renderers.BrowsableAPIRenderer',
     # ]
-    
+
 }
 
 # Password validation
@@ -203,10 +203,11 @@ SIMPLE_JWT = {
 
     'JTI_CLAIM': 'jti',
 
-    
+
 }
 CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://localhost:3000",
+    '*'
 ]
 # CORS_ALLOW_ALL_ORIGINS=True

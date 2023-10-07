@@ -21,4 +21,5 @@ urlpatterns = [
     path('setting/changeimage/',views.CompanySettingsUploadImageAPIView.as_view()),
     path('wallethistory',views.CompanyWalletHistoryApIView.as_view()),
     path('program/invitation/<str:pk1>/<str:pk2>',views.CompanyPrivateInvitationAPIView.as_view()),
+    path('update-company-program/<int:program_id>/', views.UpdateCompanyProgram, name='update-company-program'),
 ]

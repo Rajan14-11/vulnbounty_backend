@@ -28,7 +28,7 @@ class CompanyRegisterSerializer(serializers.ModelSerializer):
             'password':{'write_only':True},
         }
 
-     
+
     def validate(self, data):
         print("reached in validator")
         if not data.get('password') or not data.get('confirm_password'):
@@ -53,7 +53,7 @@ class CompanyRegisterSerializer(serializers.ModelSerializer):
             if User.objects.filter(username=username).exists():
                 raise serializers.ValidationError("Username is already taken, please select another.")
             elif not re.search(regex, username):
-                raise serializers.ValidationError("Allowed are alphabet,number and apostrophe") 
+                raise serializers.ValidationError("Allowed are alphabet,number and apostrophe")
             else:
                 return username
     # def validate_recaptcha(self,recaptcha):
@@ -69,7 +69,7 @@ class CompanyRegisterSerializer(serializers.ModelSerializer):
     #     if verify == True:
     #         return recaptcha
     #     else:
-    #         raise serializers.ValidationError("reCAPTCHA not verifyied") 
+    #         raise serializers.ValidationError("reCAPTCHA not verifyied")
 
 
     def create(self, validated_data):
@@ -80,7 +80,7 @@ class CompanyRegisterSerializer(serializers.ModelSerializer):
             last_name=validated_data['last_name']
         )
 
-        
+
         user.set_password(validated_data['password'])
         user.save()
 
@@ -95,7 +95,7 @@ class ProgramSerializer(serializers.ModelSerializer):
     class Meta:
         model=companyProgram
         fields="__all__"
-            
+
 class CompanyProgramSerializer(serializers.ModelSerializer):
     company=UserSerializer(read_only=True)
     class Meta:
@@ -167,7 +167,7 @@ class CompanyChangeNameSerializer(serializers.Serializer):
     first_name=serializers.CharField()
     last_name=serializers.CharField()
     description=serializers.CharField()
-    
+
 class CompanyChangeUserNameSerializer(serializers.Serializer):
     email=serializers.EmailField(required=True)
     username=serializers.CharField(required=True)
@@ -186,3 +186,13 @@ class CompanyWalletHistory(serializers.ModelSerializer):
     class Meta:
         model=company_wallet_history
         fields=['company',"amount",'description','recived_from','status','created_at']
+
+# class CompanyProgramSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = companyProgram
+#         fields = '__all__'
+
+class CompanyProgramSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = companyProgram
+        exclude = ['company']

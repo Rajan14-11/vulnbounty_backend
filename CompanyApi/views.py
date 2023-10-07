@@ -1,13 +1,14 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from .serializers import CompanyRegisterSerializer, CompanyProgramSerializer, CompanySubmissionSerializer, CompanyProfessionalLeaderBoardSerializer, CompanyStudentLeaderBoardSerializer, ComapnyImageUploadSerializer, CompanySettingsSerializer, CompanyLoginDetailsSerializer, CompanyExtendedUserSerializer, CompanyCreateProgramSerializer, CompanyCreateProgramSaveSerializer
-from .serializers import CompanyChangeNameSerializer, CompanyChangeUserNameSerializer, CompanyUpdatePasswordSerializer, CompanyWalletHistory
+from .serializers import CompanyChangeNameSerializer,CompanyProgramSerializer, CompanyChangeUserNameSerializer, CompanyUpdatePasswordSerializer, CompanyWalletHistory
 from .models import company, companyProgram, submission, payments, company_login_details, company_wallet, company_wallet_history
 from django.contrib.auth.models import User
 from datetime import date
 from django.db.models import Sum
 from StudentApi.models import Student
 from ProfessionalApi.models import professional
+from rest_framework.decorators import api_view, permission_classes
 import re
 from twilio.rest import Client
 from .helpers import send_email_verification_mail, send_optional_email_verification_mail
@@ -30,7 +31,6 @@ from .decorators import allowed_users
 from ProfessionalApi.models import private_invitation
 # Geneerate Token Manually
 
-
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
 
@@ -38,7 +38,6 @@ def get_tokens_for_user(user):
         'refresh': str(refresh),
         'access': str(refresh.access_token),
     }
-
 
 class CompanyRegisterAPIView(APIView):
     renderer_classes = [UserRender]
@@ -53,6 +52,7 @@ class CompanyRegisterAPIView(APIView):
             token = get_tokens_for_user(user)
             if company_obj:
                 company_wallet.objects.create(company=company_obj)
+                print(request,email_token)
                 send_email_verification_mail(request, user.email, email_token)
                 message = 'Account created Successfully ! verify your email'
             else:
@@ -63,7 +63,6 @@ class CompanyRegisterAPIView(APIView):
             message = error_handle(serializer.errors)
             print("message", message)
             return Response(message)
-
 
 class CompanyDashboardAPIView(APIView):
 
@@ -96,7 +95,6 @@ class CompanyDashboardAPIView(APIView):
                 "payment_this_month": payment_this_month
             }
 
-
         }
         return Response(response)
         # except Exception as e:
@@ -107,7 +105,6 @@ class CompanyDashboardAPIView(APIView):
         #         "data":None
         #     }
         #     return Response(response)
-
 
 class CompanyProgramAPIView(APIView):
     renderer_classes = [UserRender]
@@ -143,8 +140,8 @@ class CompanyProgramAPIView(APIView):
             serializer = CompanyCreateProgramSerializer(data=request.data)
             if serializer.is_valid():
                 program_obj = serializer.save(company=request.user)
-                # program_obj.company=request.user
-                # program_obj.save()
+                program_obj.company=request.user
+                program_obj.save()
                 message = "Program created successfully"
             else:
                 message = "Something went wrong , Retry later"
@@ -199,7 +196,6 @@ class CompanyProgramAPIView(APIView):
         }
         return Response(response)
 
-
 class CompanyProgramDetailsAPIView(APIView):
     renderer_classes = [UserRender]
     permission_classes = [IsAuthenticated]
@@ -222,7 +218,6 @@ class CompanyProgramDetailsAPIView(APIView):
 
         return Response(response)
 
-
 class CompanyDeleteProgramAPIView(APIView):
     renderer_classes = [UserRender]
     permission_classes = [IsAuthenticated]
@@ -242,7 +237,6 @@ class CompanyDeleteProgramAPIView(APIView):
             }
 
         return Response(response)
-
 
 class CompanySubmissionAPIView(APIView):
     renderer_classes = [UserRender]
@@ -269,7 +263,6 @@ class CompanySubmissionAPIView(APIView):
         }
         return Response(response)
 
-
 class CompanySubmissionDetailsAPIView(APIView):
     renderer_classes = [UserRender]
     permission_classes = [IsAuthenticated]
@@ -291,7 +284,6 @@ class CompanySubmissionDetailsAPIView(APIView):
             }
         return Response(response)
 
-
 class CompanySubmissionRejectAPIView(APIView):
     renderer_classes = [UserRender]
     permission_classes = [IsAuthenticated]
@@ -309,7 +301,6 @@ class CompanySubmissionRejectAPIView(APIView):
             }
 
         return Response(response)
-
 
 class CompanySubmissionAcceptAPIView(APIView):
     renderer_classes = [UserRender]
@@ -341,7 +332,6 @@ class CompanySubmissionAcceptAPIView(APIView):
             }
         return Response(response)
 
-
 class CompanyLeaderBoardAPIView(APIView):
     renderer_classes = [UserRender]
     permission_classes = [IsAuthenticated]
@@ -358,7 +348,6 @@ class CompanyLeaderBoardAPIView(APIView):
 
         }
         return Response(response)
-
 
 class CompanyLeaderBoardDetailAPIView(APIView):
     renderer_classes = [UserRender]
@@ -384,7 +373,6 @@ class CompanyLeaderBoardDetailAPIView(APIView):
             }
         }
         return Response(response)
-
 
 class CompanySettingsAPIView(APIView):
     renderer_classes = [UserRender]
@@ -429,7 +417,6 @@ class CompanySettingsAPIView(APIView):
                     "ValidateNumber": PhoneValidation(ValidateNumber_obj).data,
                 }
 
-
             }
         except Exception as e:
             response = {
@@ -438,7 +425,6 @@ class CompanySettingsAPIView(APIView):
             }
             print(e)
         return Response(response)
-
 
 class CompanySettingsChangeNameAPIView(APIView):
     renderer_classes = [UserRender]
@@ -471,7 +457,6 @@ class CompanySettingsChangeNameAPIView(APIView):
             "message": message
         }
         return Response(response)
-
 
 class CompanySettingschangeUserNameAPIView(APIView):
     renderer_classes = [UserRender]
@@ -546,7 +531,7 @@ class CompanySettingschangeUserNameAPIView(APIView):
 
             # except Exception as e:
             #     message="failed"
-            print(e)
+            # print(e)``
             response = {
                 "message": message,
                 "data": None
@@ -559,7 +544,6 @@ class CompanySettingschangeUserNameAPIView(APIView):
             }
 
         return Response(response)
-
 
 class CompanySettingsUpdatePasswordAPIView(APIView):
     renderer_classes = [UserRender]
@@ -604,7 +588,6 @@ class CompanySettingsUpdatePasswordAPIView(APIView):
         }
         return Response(response)
 
-
 class CompanySettingsUploadImageAPIView(APIView):
     renderer_classes = [UserRender]
     permission_classes = [IsAuthenticated]
@@ -635,7 +618,6 @@ class CompanySettingsUploadImageAPIView(APIView):
         }
         return Response(response)
 
-
 class CompanyWalletHistoryApIView(APIView):
     renderer_classes = [UserRender]
     permission_classes = [IsAuthenticated]
@@ -649,7 +631,7 @@ class CompanyWalletHistoryApIView(APIView):
             }
         }
         return Response(response)
-    
+
 class CompanyPrivateInvitationAPIView(APIView):
     renderer_classes = [UserRender]
     permission_classes = [IsAuthenticated]
@@ -671,3 +653,23 @@ class CompanyPrivateInvitationAPIView(APIView):
 
         }
         return Response(response)
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def UpdateCompanyProgram(request, program_id):
+    try:
+        program = companyProgram.objects.get(pk=program_id)
+    except companyProgram.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    # Check if the user has permission to update this program
+    if request.user != program.company:
+        return Response({"error": "You do not have permission to update this program."}, status=status.HTTP_403_FORBIDDEN)
+
+    if request.method == 'PUT':
+        serializer = CompanyProgramSerializer(program, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
