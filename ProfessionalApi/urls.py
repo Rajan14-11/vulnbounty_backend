@@ -1,15 +1,18 @@
 from django.urls import path
 from . import views
 
-
 urlpatterns = [
     path('register/',views.ProfessionalRegisterAPIView.as_view()),
     path('dashboard/',views.ProfessionalDashboardAPIView.as_view()),
     path('programs/',views.ProfessionalProgramAPIView.as_view()),
     path('program/details/<int:pk>',views.ProfessionalProgramDetailsAPIView.as_view()),
     path('submission/',views.ProfessionalSubmissionAPIView.as_view()),
+    # path('professionals/<int:pk>/update_invitation_preference/', views.UpdateInvitationPreferenceAPIView.as_view(), name='professional-update-invitation-preference'),
+    # path('professionals/filter_by_invitation_preference/', views.FilterProfessionalsByInvitationPreferenceAPIView.as_view(), name='professional-filter-by-invitation-preference'),
+    path('submission-details/', views.ProfessionalSubmissionDetailsAPIView.as_view(), name='submission-details'),
     path('submission/details/<int:pk>',views.ProfessionalSubmissionDetailsAPIView.as_view()),
     path('leaderboard/',views.ProfessionalLearderAPIView.as_view()),
+    path('remove_user_from_leaderboard/', views.RemoveUserFromLeaderboardAPIView.as_view(), name='remove_user_from_leaderboard'),
     path('leaderboard/details/<int:pk>',views.ProfessionalLeaderDetailsAPIView.as_view()),
     path('setting/',views.ProfessionalSettingsAPIView.as_view()),
     path('settings/changename/',views.ProfessionalSettingsNameDescriptionAPIView.as_view()),
@@ -26,5 +29,18 @@ urlpatterns = [
     path('withdraw/',views.ProfessionalPaymentAPIView.as_view()),
     path('test',views.ProfessionalTestAPIView.as_view()),
     path('test_update',views.ProfessionalTestUpdateAPIView.as_view()),
-
+    path('upload/', views.ResumeUploadAPIView.as_view(), name='resume-upload'),
+    path('delete/<int:resume_id>/', views.ResumeDeleteAPIView.as_view(), name='resume-delete'),
+    path('quiz/', views.QuizAPIView.as_view(), name='quiz-api'),
+    path('deactivate_account/', views.DeactivateAccountAPIView.as_view(), name='deactivate_account'),
+    path('add_certification/', views.CertificationAPIView.as_view(), name='add_certification'),
+    path('certificates/', views.ListCertificatesAPIView.as_view(), name='list_certificates'),
+    path('certificates/delete/<int:certificate_id>/', views.DeleteCertificateAPIView.as_view(), name='delete_certificate'),
+    path('certificates/update/<int:certificate_id>/', views.UpdateCertificateAPIView.as_view(), name='update_certificate'),
+    path('follow/', views.FollowProfessionalAPIView.as_view(), name='follow-professional'),
+    path('unfollow/', views.UnfollowProfessionalAPIView.as_view(), name='unfollow-professional'),
+    path('follower/<int:follower_id>/', views.FollowerProfileAPIView.as_view(), name='follower-profile'),
+    path('followed-user/<int:followed_id>/', views.FollowedUserProfileAPIView.as_view(), name='followed-user-profile'),
+    path('followers-list/', views.FollowersListAPIView.as_view(), name='followers-list'),
+    path('following-list/', views.FollowingListAPIView.as_view(), name='following-list'),
 ]

@@ -1,10 +1,20 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from .serializers import CompanyRegisterSerializer, CompanyProgramSerializer, CompanySubmissionSerializer, CompanyProfessionalLeaderBoardSerializer, CompanyStudentLeaderBoardSerializer, ComapnyImageUploadSerializer, CompanySettingsSerializer, CompanyLoginDetailsSerializer, CompanyExtendedUserSerializer, CompanyCreateProgramSerializer, CompanyCreateProgramSaveSerializer
-from .serializers import CompanyChangeNameSerializer,CompanyProgramSerializer, CompanyChangeUserNameSerializer, CompanyUpdatePasswordSerializer, CompanyWalletHistory
-from .models import company, companyProgram, submission, payments, company_login_details, company_wallet, company_wallet_history
+from .serializers import CompanyChangeNameSerializer,DropdownMenuOptionSerializer,ResumeUploadSerializer,CreateSubmissionSerializer,ProgramCollectionSerializer,CompanyProgramSerializer, CompanyChangeUserNameSerializer, CompanyUpdatePasswordSerializer, CompanyWalletHistory
+from .models import company,DropdownMenuOption ,companyProgram,ProgramCollection ,submission, payments, company_login_details, company_wallet, company_wallet_history
 from django.contrib.auth.models import User
 from datetime import date
+from django.db import connection
+from rest_framework.parsers import MultiPartParser, FormParser
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode
+from django.utils.encoding import force_bytes
+from django.core.mail import send_mail
+from django.urls import reverse
+from django.contrib.sites.shortcuts import get_current_site
+from django.http import JsonResponse
+from rest_framework.permissions import AllowAny
 from django.db.models import Sum
 from StudentApi.models import Student
 from ProfessionalApi.models import professional
@@ -22,13 +32,15 @@ from MainApi.models import ExtendUser, ValidateNumber, messages
 from django.contrib.auth.hashers import make_password
 import requests
 import json
-from rest_framework import status
+from rest_framework import status,generics
 from .renderers import UserRender
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
 from MainApi.serializers import PhoneValidation
 from .decorators import allowed_users
 from ProfessionalApi.models import private_invitation
+from django.shortcuts import redirect,render
+from rest_framework import generics, status
 # Geneerate Token Manually
 
 def get_tokens_for_user(user):
@@ -38,6 +50,19 @@ def get_tokens_for_user(user):
         'refresh': str(refresh),
         'access': str(refresh.access_token),
     }
+
+def send_email_verification_mail(request, recipient_email, email_token):
+    subject = 'Email Verification'
+    message = f'Click the following link to verify your email: {request.build_absolute_uri("/api/email_verification")}/{email_token}/'
+    from_email = 'rajangouyal740@gmail.com'
+    recipient_list = [recipient_email]
+
+    try:
+        send_mail(subject, message, from_email, recipient_list)
+        return True
+    except Exception as e:
+        print(f"Email sending error: {str(e)}")
+        return False
 
 class CompanyRegisterAPIView(APIView):
     renderer_classes = [UserRender]
@@ -53,8 +78,11 @@ class CompanyRegisterAPIView(APIView):
             if company_obj:
                 company_wallet.objects.create(company=company_obj)
                 print(request,email_token)
-                send_email_verification_mail(request, user.email, email_token)
-                message = 'Account created Successfully ! verify your email'
+                email_sent=send_email_verification_mail(request, user.email, email_token)
+                if email_sent:
+                    message = 'Account created Successfully! Verify your email'
+                else:
+                    message = 'Email sending failed. Please retry.'
             else:
                 message = 'Account not created retry again'
             return Response({"message": message})
@@ -140,8 +168,8 @@ class CompanyProgramAPIView(APIView):
             serializer = CompanyCreateProgramSerializer(data=request.data)
             if serializer.is_valid():
                 program_obj = serializer.save(company=request.user)
-                program_obj.company=request.user
-                program_obj.save()
+                # program_obj.company=request.user
+                # program_obj.save()
                 message = "Program created successfully"
             else:
                 message = "Something went wrong , Retry later"
@@ -218,25 +246,23 @@ class CompanyProgramDetailsAPIView(APIView):
 
         return Response(response)
 
-class CompanyDeleteProgramAPIView(APIView):
-    renderer_classes = [UserRender]
+class CompanyProgramDeleteAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, pk):
-        print(pk)
+    def post(self, request, program_id):
         try:
-            companyProgram.objects.get(company=request.user, id=pk).delete()
-            response = {
-                "message": "Deleted Successfully"
-            }
-
-        except Exception as e:
-            print(e)
-            response = {
-                "message": "Program Not found"
-            }
-
-        return Response(response)
+            program = companyProgram.objects.get(id=program_id)
+            print(program)
+            if program.company == request.user:
+                program.delete()
+                message = "Program deleted successfully."
+                return Response({"message": message})
+            else:
+                message = "You don't have permission to delete this program."
+                return Response({"message": message}, status=status.HTTP_403_FORBIDDEN)
+        except companyProgram.DoesNotExist:
+            message = "Program not found."
+            return Response({"message": message}, status=status.HTTP_404_NOT_FOUND)
 
 class CompanySubmissionAPIView(APIView):
     renderer_classes = [UserRender]
@@ -588,6 +614,35 @@ class CompanySettingsUpdatePasswordAPIView(APIView):
         }
         return Response(response)
 
+class PasswordResetRequestAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get('email')
+        if not email:
+            return Response({"detail": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response({"detail": "No user found with this email address"}, status=status.HTTP_400_BAD_REQUEST)
+
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+        current_site = get_current_site(request)
+        reset_url = reverse('password-reset-confirm')  # Create a URL in your URLs configuration for password reset confirmation
+
+        reset_link = f"http://{current_site.domain}{reset_url}?uid={uid}&token={token}"
+
+        send_mail(
+            subject="Password Reset",
+            message=f"Click the following link to reset your password: {reset_link}",
+            from_email="your@email.com",
+            recipient_list=[email],
+        )
+
+        return Response({"detail": "Password reset email sent"}, status=status.HTTP_200_OK)
+
 class CompanySettingsUploadImageAPIView(APIView):
     renderer_classes = [UserRender]
     permission_classes = [IsAuthenticated]
@@ -645,7 +700,7 @@ class CompanyPrivateInvitationAPIView(APIView):
             hunter= professional.objects.get(professional_user=pk1)
             private_invitation.objects.create(program=program,hunter=hunter)
             response = {
-            "message":"success"
+            "message":"success",
         }
         except:
              response = {
@@ -672,4 +727,140 @@ def UpdateCompanyProgram(request, program_id):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class DeleteProgramAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, program_id):
+        try:
+            program = companyProgram.objects.get(id=program_id)
+
+            # Check if the program belongs to the current user or implement permission checks as needed.
+            if program.company == request.user:
+                program.delete()
+                message = "Program deleted successfully."
+                return Response({"message": message})
+            else:
+                message = "You don't have permission to delete this program."
+                return Response({"message": message}, status=status.HTTP_403_FORBIDDEN)
+        except companyProgram.DoesNotExist:
+            message = "Program not found."
+            return Response({"message": message}, status=status.HTTP_404_NOT_FOUND)
+
+class CreateProgramCollection(generics.CreateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ProgramCollectionSerializer
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def ListUserCollections(request):
+    collections = ProgramCollection.objects.filter(user=request.user)
+    serializer = ProgramCollectionSerializer(collections, many=True)
+    return Response(serializer.data)
+
+# Create an API to list the programs within a collection
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def ListProgramsInCollection(request, collection_id):
+    try:
+        collection = ProgramCollection.objects.get(pk=collection_id, user=request.user)
+    except ProgramCollection.DoesNotExist:
+        return Response({"error": "Collection not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    programs = collection.programs.all()
+    program_data = [CompanyProgramSerializer(program).data for program in programs]
+
+    return Response({"collection_id": collection_id, "programs": program_data})
+
+# API for creating a program
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def StoreProgramDataApi(request):
+    data = request.data
+    program = companyProgram.objects.create(
+        company=request.user,
+        slug=data['slug'],
+        title=data['title'],
+        introduction=data['introduction'],
+    )
+    program_serializer = CompanyProgramSerializer(program)
+    return Response({"message": "Program data stored successfully"}, status=status.HTTP_201_CREATED)
+
+# class StoreProgramAPIView(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def post(self, request):
+#         serializer = CompanyProgramSerializer(data=request.data)
+
+#         if serializer.is_valid():
+#             program = serializer.save(company=request.user)
+#             message = "Program stored successfully"
+#             return Response({"message": message, "program_id": program.id})
+#         else:
+#             message = "Something went wrong while storing the program."
+#             return Response({"message": message}, status=400)
+
+
+class StoreProgramAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        program_details = request.data
+        submission_obj = submission(
+            user=request.user,
+            program_details=program_details
+        )
+        submission_obj.save()
+        return Response({"message": "Program stored successfully in submission"})
+
+class ResumeUploadAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)
+
+    def post(self, request, *args, **kwargs):
+        serializer = ResumeUploadSerializer(data=request.data)
+
+        if serializer.is_valid():
+            resume = serializer.validated_data['resume']
+
+            # Generate a unique filename for the uploaded file
+            unique_filename = str(uuid.uuid4()) + resume.name[resume.name.rfind('.'):]
+            file_path = 'resumes/' + unique_filename  # Adjust the file path as needed
+
+            with open(file_path, 'wb+') as destination:
+                for chunk in resume.chunks():
+                    destination.write(chunk)
+
+            # Return the URL of the uploaded file
+            file_url = request.build_absolute_uri(file_path)
+
+            return Response({"detail": "Resume uploaded successfully", "file_url": file_url}, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class DropdownMenuOptionListView(generics.ListAPIView):
+    queryset = DropdownMenuOption.objects.all()
+    serializer_class = DropdownMenuOptionSerializer
+
+class DropdownMenuOptionSelectView(generics.CreateAPIView):
+    serializer_class = DropdownMenuOptionSerializer
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        selected_option = serializer.validated_data
+        if selected_option['is_custom']:
+            dropdown_menu_option = DropdownMenuOption.objects.create(
+                label=selected_option['label'],
+                value=selected_option['value'],
+            )
+
+            dropdown_menu_option.save()
+
+        return Response(selected_option, status=status.HTTP_201_CREATED)
 

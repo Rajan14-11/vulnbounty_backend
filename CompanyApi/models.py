@@ -1,10 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import validate_image_file_extension
-from django.core.validators import FileExtensionValidator
-from django.conf import settings
-# from ProfessionalApi.models import professional
-# from ProfessionalApi.models import professional
+from django.core.validators import FileExtensionValidator,MinValueValidator
+from django.utils import timezone
 class company(models.Model):
     company_user=models.ForeignKey(User,on_delete=models.CASCADE,default="")
     company_name=models.CharField(max_length=100, null=True)
@@ -12,7 +10,7 @@ class company(models.Model):
     description=models.CharField(max_length=200,null=True)
     forget_password_token=models.CharField(max_length=100,null=True)
     email_verification_token =models.CharField(max_length=100,null=True)
-    email_status = models.BooleanField(default=False) 
+    email_status = models.BooleanField(default=False)
     visibility = models.BooleanField(default=True)
     terms_and_policy=models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -41,11 +39,17 @@ class company_login_details(models.Model):
     new_login_time = models.DateTimeField(auto_now=True)
     host_name = models.CharField(max_length=50,null = False,default="NULL")
     old_host_name = models.CharField(max_length=50,null = False,default="NULL")
+
 class companyProgram(models.Model):
     company=models.ForeignKey(User, on_delete=models.CASCADE,)
     slug=models.SlugField(max_length=30)
     title=models.CharField(max_length=100,default="Company Name ",blank=True)
     introduction=models.TextField(max_length=1000,blank=True,default='A bug bounty program')
+    SEVERITY_CHOICES = [
+        ('Low', 'Low'),
+        ('High', 'High'),
+        ('Critical', 'Critical'),
+    ]
     choices=[
         ('G','Global'),
         ('R','Regional'),
@@ -77,16 +81,18 @@ class companyProgram(models.Model):
     p5_min=models.PositiveIntegerField(null=True,blank=False)
     p5_max=models.PositiveIntegerField(null=True,blank=False)
     max_reward=models.PositiveIntegerField(null=True,blank=True)
+    severity = models.CharField(max_length=10, choices=SEVERITY_CHOICES, default='Low')
+    expiry_date = models.DateField(null=True, blank=False, validators=[MinValueValidator(limit_value=timezone.now().date())])
     posted=models.BooleanField(default=False)
     created_at=models.DateField(auto_now=True)
     edited_at=models.DateField(auto_now=True)
-
+    profile_image = models.ImageField(upload_to='profile_images/', blank=True, null=True)
 
 class submission(models.Model):
     user=models.ForeignKey(User,on_delete=models.CASCADE,null=True)
     program=models.ForeignKey(companyProgram,on_delete=models.CASCADE,null=True)
     title = models.CharField(max_length=199)
-   
+
     # choices=[
     #     ('L','Low'),
     #     ('M','Medium'),
@@ -97,7 +103,7 @@ class submission(models.Model):
     report = models.FileField(upload_to='document/report',validators=[FileExtensionValidator(['pdf'])])
     # description= models.CharField(max_length=199)
     # additional_information = models.CharField(max_length=100)
-    
+
     status = models.CharField(max_length=50,default="pending")
     payment_status=models.BooleanField(null=True,default=False)
     payment_amount=models.FloatField(null=True)
@@ -124,3 +130,15 @@ class payments(models.Model):
     transfer_to = models.ForeignKey(User,on_delete=models.CASCADE)
     amount = models.FloatField()
     created_at = models.DateTimeField(auto_now_add=True)
+
+class ProgramCollection(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    program = models.ForeignKey(companyProgram, on_delete=models.CASCADE)
+
+class DropdownMenuOption(models.Model):
+    label = models.CharField(max_length=255)
+    value = models.CharField(max_length=255)
+    is_custom = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.label

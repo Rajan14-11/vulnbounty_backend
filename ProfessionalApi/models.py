@@ -4,6 +4,7 @@ from django.core.validators import validate_image_file_extension
 from django.core.validators import FileExtensionValidator
 from django.conf import settings
 from CompanyApi.models import companyProgram
+import uuid
 # Create your models here.
 class professional(models.Model):
     professional_user = models.ForeignKey(User,related_name='professional_user',on_delete=models.CASCADE)
@@ -15,11 +16,12 @@ class professional(models.Model):
     forget_password_token=models.CharField(max_length=100,null=True)
     optional_email=models.EmailField()
     email_verification_token =models.CharField(max_length=100,null=True)
-    email_status = models.BooleanField(default=False) 
+    email_status = models.BooleanField(default=False)
     interst=models.CharField(max_length=40,null = True)
     terms_and_policy=models.BooleanField(default=False)
     visibility=models.BooleanField(default=True)
     test_status=models.BooleanField(default=False,null=True)
+    invitation_preference = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -30,6 +32,16 @@ class private_invitation(models.Model):
     program=models.ForeignKey(companyProgram,on_delete=models.CASCADE)
     hunter=models.ForeignKey(professional, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
+class Certificate(models.Model):
+    certificate_name = models.CharField(max_length=255)
+    organisations = models.CharField(max_length=255)
+    issues_date = models.DateField()
+    expiry_date = models.DateField()
+    certificate_id = models.CharField(max_length=255,default=uuid.uuid4)
+    certificate_url = models.URLField()
+
+    def __str__(self):
+        return self.certificate_name
 class professional_socialmedia(models.Model):
     user=models.ForeignKey(User,on_delete=models.CASCADE)
     title=models.CharField(max_length=30)
@@ -48,6 +60,10 @@ class professional_wallet_history(models.Model):
         ]
     status=models.CharField(max_length=3,null = False,choices=choices)
     created_at = models.DateTimeField(auto_now_add=True)
+class Follower(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='following')
+    professional = models.ForeignKey(professional, on_delete=models.CASCADE, related_name='followers')
+    created_at = models.DateTimeField(auto_now_add=True)
 class professional_information(models.Model):
     professional = models.OneToOneField(professional,on_delete=models.CASCADE)
     choices=[
@@ -56,6 +72,20 @@ class professional_information(models.Model):
         ]
     country_names=models.CharField(max_length=3,null = False,choices=choices)
     status = models.BooleanField(default=False)
+
+class QuizQuestion(models.Model):
+    question = models.CharField(max_length=255)
+    correct_answer = models.CharField(max_length=1, choices=[('a', 'A'), ('b', 'B'), ('c', 'C'), ('d', 'D'), ('e', 'E')])
+
+class UserAnswer(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    question = models.ForeignKey(QuizQuestion, on_delete=models.CASCADE)
+    user_answer = models.CharField(max_length=1, choices=[('a', 'A'), ('b', 'B'), ('c', 'C'), ('d', 'D'), ('e', 'E')])
+
+class ResumeModel(models.Model):
+    file_content = models.BinaryField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
 class professional_login_details(models.Model):
     professional=models.OneToOneField(professional,on_delete=models.CASCADE)
     ip_address=models.GenericIPAddressField(default="92.0.2.0")
@@ -68,8 +98,7 @@ class professional_login_details(models.Model):
 class professional_favourite_program(models.Model):
     professional = models.ForeignKey(professional,on_delete=models.CASCADE)
     program_id =models.ForeignKey(companyProgram,on_delete=models.CASCADE)
-    
+
 class professional_test(models.Model):
     question=models.TextField()
     answer=models.TextField()
-

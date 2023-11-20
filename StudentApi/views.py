@@ -89,9 +89,9 @@ class StudentRegisterAPIView(APIView):
         else:
             message = error_handle(serializer.errors)
             print("message",message)
-            
 
-            return Response(message)  
+
+            return Response(message)
 
 
 class StudentDashboardAPIView(APIView):
@@ -128,10 +128,11 @@ class StudentPrgramAPIView(APIView):
     renderer_classes=[UserRender]
     permission_classes=[IsAuthenticated]
     def get(self,request):
-            professional_obj=Student.objects.get(student_user=request.user)
-            professional_information_obj=student_information.objects.get(student=professional_obj.id)
-            region=professional_information_obj.country_names
-            data=companyProgram.objects.all().filter((Q(region ='all') | Q(region = region) )) # & ~Q(visibility='P')
+            # professional_obj=Student.objects.get(student_user=request.user)
+            # professional_information_obj=student_information.objects.get(student=professional_obj.id)
+            # region=professional_information_obj.country_names
+            data=companyProgram.objects.all().filter((Q(region ='all') )) # & ~Q(visibility='P')
+            # data=companyProgram.objects.all().filter((Q(region ='all') | Q(region = region) )) # & ~Q(visibility='P')
             # invited_program=private_invitation.objects.filter(hunter=professional_obj.id)
             response={
                 "message":"success",
@@ -161,7 +162,7 @@ class StudentProgramDetailsAPIView(APIView):
             }
         }
         return Response(response)
-  
+
 
 class StudentSubmissionAPIView(APIView):
     renderer_classes=[UserRender]
@@ -224,7 +225,7 @@ class StudentLearderAPIView(APIView):
         except :
             serialzer=None
             message="Failed"
-        
+
         response={
             "message":message,
             "data":{
@@ -265,11 +266,11 @@ class StudentSettingsAPIView(APIView):
             professional_login_details_obj=student_login_details.objects.get(student=profesional_obj)
             try:
                 ExtendUser_obj=ExtendUser.objects.get(user=request.user.id)
-            
+
             except:
                 ExtendUser.objects.create(user=request.user)
                 ExtendUser_obj=ExtendUser.objects.get(user=request.user.id)
-                
+
             try:
                 ValidateNumber_obj=ValidateNumber.objects.get(user=ExtendUser_obj.id)
                 if ValidateNumber_obj.status == True:
@@ -279,17 +280,17 @@ class StudentSettingsAPIView(APIView):
             except:
                 ValidateNumber_obj=None
                 ValidateNumber_status="False"
-                
+
             response={
                 "message":"success",
-                "data":{ 
+                "data":{
                 "details":StudentSettingsSerializer( profesional_obj).data,
                 "program_count":program_count,
                 "total_payment":total_payment,
                 "login_details":StudentLoginDetailsSerializer(professional_login_details_obj).data,
                 "ExtendUser":StudentExtendedUserSerializer(ExtendUser_obj).data,
                 "ValidateNumber":ValidateNumber_obj,}
-            
+
 
                 }
         except Exception as e:
@@ -323,7 +324,7 @@ class StudentSettingNameDescriptionAPIView(APIView):
         else:
             message=error_handle(serializer.errors)
             print("message",message)
-            
+
 
             return Response(message)
 
@@ -353,7 +354,7 @@ class StudentSettingsUploadPictureAPIView(APIView):
         else:
             return Response({"message":"Failed"})
 
- 
+
 class StudentSettingsUserEmailAPIView(APIView):
     renderer_classes=[UserRender]
     permission_classes=[IsAuthenticated]
@@ -379,10 +380,10 @@ class StudentSettingsUserEmailAPIView(APIView):
                     request, username=request.user.username, password=password)
                 if user is not None:
                     if request.user.username != username:
-                        
+
                         if User.objects.filter(username=username).exists():
                             message='Username already taken'
-                            
+
                         else:
                             User.objects.filter(id=user.id).update(username=username)
                             message=' Username successfully updated !'
@@ -404,17 +405,17 @@ class StudentSettingsUserEmailAPIView(APIView):
 
                                 else:
                                     message='You already added this Email'
-                                
+
                             except:
                                 print("create")
                                 ExtendUser.objects.create(user=user,optional_email=email,optional_email_token=token)
                                 send_email_verification_mail(request,email,token)
                                 message='Email successfully Added, Now Verify the email'
-                                
-                    
+
+
                 else:
                     message='Password doesnot match'
-        
+
             except Exception as e:
                 message="failed"
                 print(e)
@@ -422,12 +423,12 @@ class StudentSettingsUserEmailAPIView(APIView):
                 "message":message,
                 "data":None
             }
-            
+
         else:
             message=error_handle(serializer.errors)
             print("message",message)
             return Response(message)
-        
+
         return Response(response)
 
 
@@ -442,7 +443,7 @@ class StudentSettingsUpdatePasswordAPIView(APIView):
             password_3=request.data['password3']
             if not password_1 or not password_2 or not password_3:
                 message="Fields should not be empty"
-            user_obj = authenticate(request, username=request.user.username, password=password_1) 
+            user_obj = authenticate(request, username=request.user.username, password=password_1)
             if user_obj is not None:
                 if not password_2 and not password_3:
                     message="New password confirm password should not be empty and length more than 9"
@@ -496,7 +497,7 @@ class StudentSettingsSkillsAPIView(APIView):
             profe_user=Student.objects.get(student_user=request.user.id)
             skill=request.data['skill']
             sample_skills = ["A# .NET","A# (Axiom)","A-0 System","A+","A++","ABAP","ABC","ABC ALGOL","ABLE","ABSET","ABSYS","ACC","Accent","Ace DASL","ACL2","ACT-III","Action!","ActionScript","Ada","Adenine","Agda","Agilent VEE","Agora","AIMMS","Alef","ALF","ALGOL 58","ALGOL 60","ALGOL 68","ALGOL W","Alice","Alma-0","AmbientTalk","Amiga E","AMOS","AMPL","APL","App Inventor for Android's visual block language","AppleScript","Arc","ARexx","Argus","AspectJ","Assembly language","ATS","Ateji PX","AutoHotkey","Autocoder","AutoIt","AutoLISP / Visual LISP","Averest","AWK","Axum","B","Babbage","Bash","BASIC","bc","BCPL","BeanShell","Batch (Windows/Dos)","Bertrand","BETA","Bigwig","Bistro","BitC","BLISS","Blue","Bon","Boo","Boomerang","Bourne shell","bash","ksh","BREW","BPEL","C","C--","C++","C#","C/AL","Caché ObjectScript","C Shell","Caml","Candle","Cayenne","CDuce","Cecil","Cel","Cesil","Ceylon","CFEngine","CFML","Cg","Ch","Chapel","CHAIN","Charity","Charm","Chef","CHILL","CHIP-8","chomski","ChucK","CICS","Cilk","CL","Claire","Clarion","Clean","Clipper","CLIST","Clojure","CLU","CMS-2","COBOL","Cobra","CODE","CoffeeScript","Cola","ColdC","ColdFusion","COMAL","Combined Programming Language","COMIT","Common Intermediate Language","Common Lisp","COMPASS","Component Pascal","Constraint Handling Rules","Converge","Cool","Coq","Coral 66","Corn","CorVision","COWSEL","CPL","csh","CSP","Csound","CUDA","Curl","Curry","Cyclone","Cython","D","DASL","DASL","Dart","DataFlex","Datalog","DATATRIEVE","dBase","dc","DCL","Deesel","Delphi","DinkC","DIBOL","Dog","Draco","DRAKON","Dylan","DYNAMO","E","E#","Ease","Easy PL/I","Easy Programming Language","EASYTRIEVE PLUS","ECMAScript","Edinburgh IMP","EGL","Eiffel","ELAN","Elixir","Elm","Emacs Lisp","Emerald","Epigram","EPL","Erlang","es","Escapade","Escher","ESPOL","Esterel","Etoys","Euclid","Euler","Euphoria","EusLisp Robot Programming Language","CMS EXEC","EXEC 2","Executable UML","F","F#","Factor","Falcon","Fancy","Fantom","FAUST","Felix","Ferite","FFP","Fjölnir","FL","Flavors","Flex","FLOW-MATIC","FOCAL","FOCUS","FOIL","FORMAC","@Formula","Forth","Fortran","Fortress","FoxBase","FoxPro","FP","FPr","Franz Lisp","Frege","F-Script","FSProg","G","Google Apps Script","Game Maker Language","GameMonkey Script","GAMS","GAP","G-code","Genie","GDL","Gibiane","GJ","GEORGE","GLSL","GNU E","GM","Go","Go!","GOAL","Gödel","Godiva","GOM (Good Old Mad)","Goo","Gosu","GOTRAN","GPSS","GraphTalk","GRASS","Groovy","Hack (programming language)","HAL/S","Hamilton C shell","Harbour","Hartmann pipelines","Haskell","Haxe","High Level Assembly","HLSL","Hop","Hope","Hugo","Hume","HyperTalk","IBM Basic assembly language","IBM HAScript","IBM Informix-4GL","IBM RPG","ICI","Icon","Id","IDL","Idris","IMP","Inform","Io","Ioke","IPL","IPTSCRAE","ISLISP","ISPF","ISWIM","J","J#","J++","JADE","Jako","JAL","Janus","JASS","Java","JavaScript","JCL","JEAN","Join Java","JOSS","Joule","JOVIAL","Joy","JScript","JScript .NET","JavaFX Script","Julia","Jython","K","Kaleidoscope","Karel","Karel++","KEE","Kixtart","KIF","Kojo","Kotlin","KRC","KRL","KUKA","KRYPTON","ksh","L","L# .NET","LabVIEW","Ladder","Lagoona","LANSA","Lasso","LaTeX","Lava","LC-3","Leda","Legoscript","LIL","LilyPond","Limbo","Limnor","LINC","Lingo","Linoleum","LIS","LISA","Lisaac","Lisp","Lite-C","Lithe","Little b","Logo","Logtalk","LPC","LSE","LSL","LiveCode","LiveScript","Lua","Lucid","Lustre","LYaPAS","Lynx","M2001","M4","Machine code","MAD","MAD/I","Magik","Magma","make","Maple","MAPPER","MARK-IV","Mary","MASM Microsoft Assembly x86","Mathematica","MATLAB","Maxima","Macsyma","Max","MaxScript","Maya (MEL)","MDL","Mercury","Mesa","Metacard","Metafont","MetaL","Microcode","MicroScript","MIIS","MillScript","MIMIC","Mirah","Miranda","MIVA Script","ML","Moby","Model 204","Modelica","Modula","Modula-2","Modula-3","Mohol","MOO","Mortran","Mouse","MPD","CIL","MSL","MUMPS","NASM","NATURAL","Napier88","Neko","Nemerle","nesC","NESL","Net.Data","NetLogo","NetRexx","NewLISP","NEWP","Newspeak","NewtonScript","NGL","Nial","Nice","Nickle","Nim","NPL","Not eXactly C","Not Quite C","NSIS","Nu","NWScript","NXT-G","o:XML","Oak","Oberon","Obix","OBJ2","Object Lisp","ObjectLOGO","Object REXX","Object Pascal","Objective-C","Objective-J","Obliq","Obol","OCaml","occam","occam-π","Octave","OmniMark","Onyx","Opa","Opal","OpenCL","OpenEdge ABL","OPL","OPS5","OptimJ","Orc","ORCA/Modula-2","Oriel","Orwell","Oxygene","Oz","P#","ParaSail (programming language)","PARI/GP","Pascal","Pawn","PCASTL","PCF","PEARL","PeopleCode","Perl","PDL","PHP","Phrogram","Pico","Picolisp","Pict","Pike","PIKT","PILOT","Pipelines","Pizza","PL-11","PL/0","PL/B","PL/C","PL/I","PL/M","PL/P","PL/SQL","PL360","PLANC","Plankalkül","Planner","PLEX","PLEXIL","Plus","POP-11","PostScript","PortablE","Powerhouse","PowerBuilder","PowerShell","PPL","Processing","Processing.js","Prograph","PROIV","Prolog","PROMAL","Promela","PROSE modeling language","PROTEL","ProvideX","Pro*C","Pure","Python","Q (equational programming language)","Q (programming language from Kx Systems)","Qalb","QtScript","QuakeC","QPL","R","R++","Racket","RAPID","Rapira","Ratfiv","Ratfor","rc","REBOL","Red","Redcode","REFAL","Reia","Revolution","rex","REXX","Rlab","RobotC","ROOP","RPG","RPL","RSL","RTL/2","Ruby","RuneScript","Rust","S","S2","S3","S-Lang","S-PLUS","SA-C","SabreTalk","SAIL","SALSA","SAM76","SAS","SASL","Sather","Sawzall","SBL","Scala","Scheme","Scilab","Scratch","Script.NET","Sed","Seed7","Self","SenseTalk","SequenceL","SETL","Shift Script","SIMPOL","SIGNAL","SiMPLE","SIMSCRIPT","Simula","Simulink","SISAL","SLIP","SMALL","Smalltalk","Small Basic","SML","Snap!","SNOBOL","SPITBOL","Snowball","SOL","Span","SPARK","Speedcode","SPIN","SP/k","SPS","Squeak","Squirrel","SR","S/SL","Stackless Python","Starlogo","Strand","Stata","Stateflow","Subtext","SuperCollider","SuperTalk","Swift (Apple programming language)","Swift (parallel scripting language)","SYMPL","SyncCharts","SystemVerilog","T","TACL","TACPOL","TADS","TAL","Tcl","Tea","TECO","TELCOMP","TeX","TEX","TIE","Timber","TMG","Tom","TOM","Topspeed","TPU","Trac","TTM","T-SQL","TTCN","Turing","TUTOR","TXL","TypeScript","Turbo C++","Ubercode","UCSD Pascal","Umple","Unicon","Uniface","UNITY","Unix shell","UnrealScript","Vala","VBA","VBScript","Verilog","VHDL","Visual Basic","Visual Basic .NET","Visual DataFlex","Visual DialogScript","Visual Fortran","Visual FoxPro","Visual J++","Visual J#","Visual Objects","Visual Prolog","VSXu","Vvvv","WATFIV, WATFOR","WebDNA","WebQL","Windows PowerShell","Winbatch","Wolfram","Wyvern","X++","X#","X10","XBL","XC","XMOS architecture","xHarbour","XL","Xojo","XOTcl","XPL","XPL0","XQuery","XSB","XSLT","XPath","Xtend","Yorick","YQL","Z notation","Zeno","ZOPL","ZPL"]
-        
+
             if not skill:
                 message="Skill is empty"
                 return Response({"message":message})
@@ -509,11 +510,11 @@ class StudentSettingsSkillsAPIView(APIView):
             else:
                 skills.objects.create(user=profe_user,skill=skill)
                 message="Skill added successfully"
-                return Response({"message":message})  
+                return Response({"message":message})
         else:
             message=error_handle(serializer.errors)
             print("message",message)
-            return Response(message)    
+            return Response(message)
 
 
 class StudentFavouriteListAPIView(APIView):
@@ -524,19 +525,19 @@ class StudentFavouriteListAPIView(APIView):
             student_data=Student.objects.get(student_user=request.user.id)
             student_favourite_program_data=student_favourite_program.objects.filter(student=student_data.id)
             serializer=StudentFavouriteProgramSerializer(student_favourite_program_data,many=True).data
-            
+
             message="Success"
         except:
             message="Failed"
             serializer=None
-        
+
 
         response={
             "message":message,
             "data":serializer
         }
         return Response(response)
-# --------------------- PROGRAM --------------------------------     
+# --------------------- PROGRAM --------------------------------
 
 
 # --------------------- SUBMISSION -----------------------------
@@ -568,15 +569,15 @@ class  SubmissionView(APIView):
             }
         return Response(response)
 
-class  Student_submission_details_view(APIView): 
-    def get(self,request,format=None): 
+class  Student_submission_details_view(APIView):
+    def get(self,request,format=None):
         user=User.objects.get(id=2)
         program_id=programs.objects.get(id=1)
         data=submission.objects.get(program=program_id,user=user)
         serializers=submissionSerializer(data)
         response=serializers.data
         return Response(response)
-       
+
 class Submit_program_view(APIView):
     def post(self,request,format=None):
         user=User.objects.get(id=2)
@@ -590,14 +591,14 @@ class Submit_program_view(APIView):
             print("message",message)
             return Response(message)
         return Response({"message":"progem submitted successfully !"})
-                
+
 
 class Chat_view(APIView):
     def post(self,request,format=None):
         user=submission.objects.get(id=1)
         if request.method=='POST' and 'chat_send' in request.POST:
             text=request.POST.get('text')
-            
+
             sender_id=request.user.id
             data=submission.objects.get(id=user)
             serializers=submissionSerializer(data)
@@ -665,7 +666,7 @@ class Payment_view(APIView):
             success_url="http://{}/student/payment_success/{}".format(host,amount),
             cancel_url="http://"+host+'/student/payment_cancel',
             )
-            
+
             # return redirect(checkout_session.url, code=303)
         student_data=Student.objects.get(student_user=user)
         serializers=StudentSerializer(student_data)
@@ -686,13 +687,13 @@ class Payment_view(APIView):
             "transaction":transaction_data,
             "wallet_tranaction":wallet_tranaction_data
         }
-        
+
         return Response(context)
 
 
 class Payment_success_view(APIView):
     def get(self,request,amount):
-        user=User.objects.get(id=2) 
+        user=User.objects.get(id=2)
         student_obj=Student.objects.get(student_user=user)
         serializers=StudentSerializer(student_obj)
         student_obj_data=serializers.data
@@ -724,11 +725,11 @@ class  Leaderboard_detail_view(APIView):
         serializers=StudentSerializer(data)
         response=serializers.data
         return Response(response)
-        
+
 # --------------------- PROFILE --------------------------------
 
 
-    # 
+    #
     #CHANGING FIRST_NAME AND LAST_NAME AND PROFILE DESCRIPTION
 class Profile_setting(APIView):
     def post(self,request):
@@ -755,9 +756,9 @@ class Profile_setting(APIView):
         return Response({"meassge":"Successfully updated !"})
 
 
-#CHANGINGING USERNAME AND EMAIL USING PASSWORD       
+#CHANGINGING USERNAME AND EMAIL USING PASSWORD
 class Update_Password(APIView):
-    def post(self,request):    
+    def post(self,request):
             try:
                 regex = "^([a-z]+('[a-z])?[0-9a-z]*)$"
                 print("reached_up")
@@ -821,7 +822,7 @@ class Update_Password(APIView):
                                 send_email_verification_mail(email,token)
                                 message.success(request,'Email successfully Added !')
                                 pass
-                
+
                 else:
                     message.error(request,'Password doesnot match')
             except Exception as e:
@@ -830,7 +831,7 @@ class Update_Password(APIView):
             return Response({"meassage":"Updated Successfully"})
 
 
-# ADDING SKILLS AND INTSEREST 
+# ADDING SKILLS AND INTSEREST
 class Add_Skills(APIView):
     def post(self,request):
         user=User.objects.get(id=2)
@@ -865,7 +866,7 @@ class Update_img(APIView):
                         os.remove(data_profile.profile_picture.path)
                     data_profile.profile_picture=file
                     serializers.save()
-                
+
                 message.success(request,"Image successfully added")
                 return Response({"message":"Image successfully added"})
             except:
@@ -883,12 +884,12 @@ class Update_img(APIView):
             file_exists=os.path.exists(data.profile_picture.path)
             if file_exists == True:
                 os.remove(data.profile_picture.path)
-                
+
         return Response({"message":"Image successfully added"})
 
 
-        
-# ADDING AND  UPDATING  RESUME 
+
+# ADDING AND  UPDATING  RESUME
 class Update_resume(APIView):
     def post(self,request):
         user=User.objects.get(id=2)
@@ -921,7 +922,7 @@ class Update_Old_Password(APIView):
         password_3=request.POST.get('password3')
         if not password_1 or not password_2 or not password_3:
             return Response({"message":"Field should not be empty"})
-        user = authenticate(request, username=request.user.username, password=password_1) 
+        user = authenticate(request, username=request.user.username, password=password_1)
         if user is not None:
             if password_2==password_3:
                 password=make_password(password_2)
@@ -938,8 +939,8 @@ class Update_Old_Password(APIView):
 
         else:
             print("Old password not match")
-            return Response({"message":"Old password not match"})   
-        
+            return Response({"message":"Old password not match"})
+
 
 # Optional email verification
 
@@ -950,9 +951,9 @@ class Email_verification(APIView):
         serializers=ExtendUserSerializer(ExtendUser_obj)
         Extend_data=serializers.data
         token=request.POST.get('token')
-        return Response(Extend_data) 
+        return Response(Extend_data)
 
-    # phone number validation 
+    # phone number validation
 class Phone_validation(APIView):
     def post(self,request):
         user=User.objects.get(id=2)
@@ -988,7 +989,7 @@ class Phone_validation(APIView):
             except:
                 ValidateNumber_obj=NULL
                 number=f'{country}{phone_number}'
-                account_sid =settings.TWILIO_ACCOUNT_SID 
+                account_sid =settings.TWILIO_ACCOUNT_SID
                 auth_token = settings.TWILIO_AUTH_TOKEN
                 client = Client(account_sid, auth_token)
                 validation_code=9023456
@@ -1005,8 +1006,8 @@ class Phone_validation(APIView):
                         return Response(Extend_data)
                 except:
                     print("Something went Wrong retry again")
-            
-        
+
+
             print("code is NOne")
         print(code)
         return Response({"message":"phone in validated"})
@@ -1108,7 +1109,7 @@ class Student_favourite_program_view(APIView):
             return Response({"message":"student favourite program  created "})
 
 
-          
+
 class Student_favourite_program_list_view(APIView):
     def get(self,request,format=None):
         user=User.objects.get(id=2)
@@ -1120,8 +1121,7 @@ class Student_favourite_program_list_view(APIView):
         data=serializers.data
         context={
             "student_favourite_program_data":data,
-        
+
         }
         return Response(context)
 
-        

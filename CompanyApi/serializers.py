@@ -1,19 +1,18 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import companyProgram,submission,company,company_login_details,company_wallet_history
+from .models import companyProgram,DropdownMenuOption,submission,ProgramCollection,company,company_login_details,company_wallet_history
 from ProfessionalApi.models import professional
 from StudentApi.models import Student
 from MainApi.models import ExtendUser
+from django.core.files.uploadedfile import UploadedFile
 import re
 # from rest_framework_recaptcha import ReCaptchaField
-
 
 
 # class MyReCaptchaField(ReCaptchaField):
 #     default_error_messages = {
 #         "invalid-input-response": "reCAPTCHA token is invalid.",
 #     }
-
 
 class CompanyRegisterSerializer(serializers.ModelSerializer):
     confirm_password=serializers.CharField()
@@ -71,7 +70,6 @@ class CompanyRegisterSerializer(serializers.ModelSerializer):
     #     else:
     #         raise serializers.ValidationError("reCAPTCHA not verifyied")
 
-
     def create(self, validated_data):
         user = User.objects.create(
             username=validated_data['username'],
@@ -83,7 +81,6 @@ class CompanyRegisterSerializer(serializers.ModelSerializer):
 
         user.set_password(validated_data['password'])
         user.save()
-
 
         return user
 class UserSerializer(serializers.ModelSerializer):
@@ -109,17 +106,30 @@ class CompanySubmissionSerializer(serializers.ModelSerializer):
         model=submission
         fields="__all__"
 
+
+
 class CompanyProfessionalLeaderBoardSerializer(serializers.ModelSerializer):
-    professional_user=UserSerializer(read_only=True)
+    professional_user = UserSerializer(read_only=True)
+    user_id = serializers.SerializerMethodField()
+
     class Meta:
-        model=professional
-        fields=['professional_user','phone','profile_picture','profile_description','resume','reward','optional_email','interst']
+        model = professional
+        fields = ['user_id', 'professional_user', 'phone', 'profile_picture', 'profile_description', 'resume', 'reward', 'optional_email', 'interst']
+
+    def get_user_id(self, obj):
+        return obj.professional_user.id
 
 class CompanyStudentLeaderBoardSerializer(serializers.ModelSerializer):
-    student_user=UserSerializer(read_only=True)
+    student_user = UserSerializer(read_only=True)
+    user_id = serializers.SerializerMethodField()
+
     class Meta:
-        model=Student
-        fields="__all__"
+        model = Student
+        fields = ('user_id','phone', 'profile_picture', 'profile_description', 'resume', 'reward','interst','reward','student_user')
+
+    def get_user_id(self, obj):
+        return obj.student_user.id
+
 class ComapnyImageUploadSerializer(serializers.ModelSerializer):
     profile_picture=serializers.ImageField(required=True)
     class Meta:
@@ -133,7 +143,6 @@ class ComapnyImageUploadSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"profile_picture":"This field is required."})
         else:
             return data
-
 
 class CompanySettingsSerializer(serializers.ModelSerializer):
     company_user=UserSerializer(read_only=True)
@@ -151,17 +160,16 @@ class CompanyExtendedUserSerializer(serializers.ModelSerializer):
         model=ExtendUser
         fields="__all__"
 
-
 class CompanyCreateProgramSerializer(serializers.ModelSerializer):
     class Meta:
         model=companyProgram
-        fields=['slug','title','introduction','vulnerability_concerns','target','out_target','scope_type','visibility','p1_min','p1_max','p2_min','p2_max','p3_min','p3_max','p4_min','p4_max','p5_min','p5_max']
+        fields=['slug','title','introduction','vulnerability_concerns','target','out_target','scope_type','severity','expiry_date','visibility','p1_min','p1_max','p2_min','p2_max','p3_min','p3_max','p4_min','p4_max','p5_min','p5_max']
 
 
 class CompanyCreateProgramSaveSerializer(serializers.ModelSerializer):
     class Meta:
         model=companyProgram
-        fields=['slug','title','introduction','vulnerability_concerns','region','visibility']
+        fields=['slug','title','introduction','vulnerability_concerns','region','visibility','severity','expiry_date']
 
 class CompanyChangeNameSerializer(serializers.Serializer):
     first_name=serializers.CharField()
@@ -173,12 +181,10 @@ class CompanyChangeUserNameSerializer(serializers.Serializer):
     username=serializers.CharField(required=True)
     password=serializers.CharField(required=True)
 
-
 class CompanyUpdatePasswordSerializer(serializers.Serializer):
     password1=serializers.CharField()
     password2=serializers.CharField()
     password3=serializers.CharField()
-
 
 class CompanyWalletHistory(serializers.ModelSerializer):
     company=CompanySettingsSerializer(read_only=True)
@@ -187,12 +193,53 @@ class CompanyWalletHistory(serializers.ModelSerializer):
         model=company_wallet_history
         fields=['company',"amount",'description','recived_from','status','created_at']
 
-# class CompanyProgramSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = companyProgram
-#         fields = '__all__'
-
 class CompanyProgramSerializer(serializers.ModelSerializer):
+    company_name = serializers.SerializerMethodField()
     class Meta:
         model = companyProgram
         exclude = ['company']
+    def get_company_name(self, obj):
+        return obj.company.username
+
+class ProgramCollectionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProgramCollection
+        fields = '__all__'
+
+class CreateSubmissionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = submission
+        fields = '__all__'
+
+class PasswordResetSerializer(serializers.Serializer):
+    password = serializers.CharField(write_only=True)
+    confirm_password = serializers.CharField(write_only=True)
+
+    def validate(self, data):
+        password = data.get('password')
+        confirm_password = data.get('confirm_password')
+
+        if password != confirm_password:
+            raise serializers.ValidationError("Passwords do not match.")
+
+        return data
+
+class ResumeUploadSerializer(serializers.Serializer):
+    resume = serializers.FileField()
+
+    def validate_resume(self, value):
+        allowed_extensions = ('pdf', 'doc', 'docx')
+        file_extension = value.name.split('.')[-1].lower()
+        if file_extension not in allowed_extensions:
+            raise serializers.ValidationError("Unsupported file format. Supported formats: pdf, doc, docx")
+
+        max_file_size = 1 * 1024 * 1024
+        if value.size > max_file_size:
+            raise serializers.ValidationError("File size exceeds the limit of 10 MB")
+
+        return value
+
+class DropdownMenuOptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DropdownMenuOption
+        fields = ('id', 'label', 'value')

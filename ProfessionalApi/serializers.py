@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import *
+from CompanyApi.models import submission
 import re
 from MainApi.models import ExtendUser
 from CompanyApi.models import submission,companyProgram
@@ -19,7 +20,7 @@ class ProfessionalRegisterSdrializer(serializers.ModelSerializer):
             'password':{'write_only':True},
         }
 
-     
+
     def validate(self, data):
         print("reached in validator")
         if not data.get('password') or not data.get('confirm_password'):
@@ -44,7 +45,7 @@ class ProfessionalRegisterSdrializer(serializers.ModelSerializer):
             if User.objects.filter(username=username).exists():
                 raise serializers.ValidationError("Username is already taken, please select another.")
             elif not re.search(regex, username):
-                raise serializers.ValidationError("Allowed are alphabet,number and apostrophe") 
+                raise serializers.ValidationError("Allowed are alphabet,number and apostrophe")
             else:
                 return username
     # def validate_recaptcha(self,recaptcha):
@@ -60,8 +61,7 @@ class ProfessionalRegisterSdrializer(serializers.ModelSerializer):
     #     if verify == True:
     #         return recaptcha
     #     else:
-    #         raise serializers.ValidationError("reCAPTCHA not verifyied") 
-
+    #         raise serializers.ValidationError("reCAPTCHA not verifyied")
 
     def create(self, validated_data):
         user = User.objects.create(
@@ -71,13 +71,38 @@ class ProfessionalRegisterSdrializer(serializers.ModelSerializer):
             last_name=validated_data['last_name']
         )
 
-        
+
         user.set_password(validated_data['password'])
         user.save()
 
         return user
-  
 
+class PrivateInvitationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = private_invitation
+        fields = '__all__'
+class ProfessionalDashboardSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = professional
+        fields = '__all__'
+
+class ProfessionalSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = professional
+        fields = ('id', 'invitation_preference')
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = professional
+        fields = '__all__'
+class CertificateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Certificate
+        fields = '__all__'
+class ProfessionalSubmissionSerialiser(serializers.ModelSerializer):
+    class Meta:
+        model = submission
+        fields = '__all__'
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model=User
@@ -86,8 +111,7 @@ class ProfessionalDashbordserializer(serializers.ModelSerializer):
     professional_user=UserSerializer(read_only=True)
     class Meta:
         model=professional
-        fields=['professional_user','phone','profile_picture','profile_description','resume','reward','optional_email','interst']
-
+        fields=['professional_user','phone','profile_picture','profile_description','resume','reward','optional_email','interst','invitation_preference']
 
 class ProfessionalFavouriteProgramSerializer(serializers.ModelSerializer):
     program_id=CompanyProgramSerializer(read_only=True)
@@ -106,7 +130,6 @@ class ProfessionalprogramSubmissionSerializer(serializers.ModelSerializer):
             return program_id
         else:
             raise serializers.ValidationError("Program not found with given id")
-            
 
 
     # def create(self, validated_data):
@@ -117,19 +140,37 @@ class ProfessionalprogramSubmissionSerializer(serializers.ModelSerializer):
     #         last_name=validated_data['last_name']
     #     )
 
-        
+
     #     user.set_password(validated_data['password'])
     #     user.save()
 
     #     return user
+class UserAnswerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserAnswer
+        fields = ['question', 'user_answer']
 
+class ResumeUploadSerializer(serializers.Serializer):
+    resume = serializers.FileField()
+
+    def validate_resume(self, value):
+        allowed_extensions = ('pdf', 'doc', 'docx')
+        file_extension = value.name.split('.')[-1].lower()
+        if file_extension not in allowed_extensions:
+            raise serializers.ValidationError("Unsupported file format. Supported formats: pdf, doc, docx")
+
+        max_file_size = 1 * 1024 * 1024
+        if value.size > max_file_size:
+            raise serializers.ValidationError("File size exceeds the limit of 10 MB")
+
+        return value
 
 class ProfessionalChangeNameSerialzer(serializers.Serializer):
     first_name=serializers.CharField(required=True)
     last_name=serializers.CharField(required=True)
     description=serializers.CharField(required=True)
 
-  
+
 
 class ProfessionalUpdateimageSerializer(serializers.ModelSerializer):
     profile_picture=serializers.ImageField(required=True)
@@ -139,7 +180,7 @@ class ProfessionalUpdateimageSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'profile_picture': {'required': True},
         }
-        
+
 
 class ProfessionalUpdateResumeSerializer(serializers.ModelSerializer):
     resume=serializers.FileField(required=True)
@@ -171,7 +212,7 @@ class ProfessionalSettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model=professional
         fields="__all__"
-    
+
 class ProfessionalLoginDetailsSerializer(serializers.ModelSerializer):
     class Meta:
         model=professional_login_details
@@ -181,7 +222,6 @@ class ProfessionalExtendedUserSerializer(serializers.ModelSerializer):
     class Meta:
         model=ExtendUser
         fields="__all__"
-
 
 class ProfessionalChangeUserNameSerializer(serializers.ModelSerializer):
     email=serializers.EmailField(required=True)

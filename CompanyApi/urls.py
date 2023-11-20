@@ -1,25 +1,34 @@
 from django.urls import path
 from . import views
 
-
 urlpatterns = [
     path('register/',views.CompanyRegisterAPIView.as_view()),
     path('dashboard/',views.CompanyDashboardAPIView.as_view()),
     path('programs/',views.CompanyProgramAPIView.as_view()),
     path('program/detail/<int:pk>',views.CompanyProgramDetailsAPIView.as_view()),
-    path('program/<int:pk>',views.CompanyDeleteProgramAPIView.as_view()),
+    path('program/<int:program_id>',views.CompanyProgramDeleteAPIView.as_view()),
     path('submission/',views.CompanySubmissionAPIView.as_view()),
     path('submission/detail/<int:pk>',views.CompanySubmissionDetailsAPIView.as_view()),
     path('submission/reject/<int:pk>',views.CompanySubmissionRejectAPIView.as_view()),
+    path('update-company-program/<int:program_id>/', views.UpdateCompanyProgram, name='update-company-program'),
     path('submission/accept/<int:pk>',views.CompanySubmissionAcceptAPIView.as_view()),
     path('leaderboard/',views.CompanyLeaderBoardAPIView.as_view()),
+    # path('upload-resume/', views.ResumeUploadAPIView.as_view(), name='upload-resume'),
     path('setting/',views.CompanySettingsAPIView.as_view()),
     path('leaderboard/detail/<int:pk>',views.CompanyLeaderBoardDetailAPIView.as_view()),
     path('setting/changename/',views.CompanySettingsChangeNameAPIView.as_view()),
     path('setting/changeusername/',views.CompanySettingschangeUserNameAPIView.as_view()),
     path('setting/changepassword/',views.CompanySettingsUpdatePasswordAPIView.as_view()),
+    path('password-reset-confirm/', views.PasswordResetRequestAPIView.as_view(), name='password-reset-confirm'),
     path('setting/changeimage/',views.CompanySettingsUploadImageAPIView.as_view()),
     path('wallethistory',views.CompanyWalletHistoryApIView.as_view()),
     path('program/invitation/<str:pk1>/<str:pk2>',views.CompanyPrivateInvitationAPIView.as_view()),
-    path('update-company-program/<int:program_id>/', views.UpdateCompanyProgram, name='update-company-program'),
+    # path('api/collections/', views.CreateProgramCollection.as_view(), name='create-program-collection'),
+    # path('api/collections/user/', views.ListUserCollections, name='list-user-collections'),
+    # path('api/program/delete/<int:program_id>/', views.DeleteProgramAPIView.as_view(), name='delete-program'),
+    # path('api/collections/<int:collection_id>/', views.ListProgramsInCollection, name='list-programs-in-collection'),
+    # path('api/store-program/', views.StoreProgramDataApi, name='store-program-data'),
+    # path('create-submission/', views.StoreProgramAPIView.as_view(), name='create-submission'),
+    # path('api/dropdown-menu-options/', views.DropdownMenuOptionListView.as_view(), name='dropdown-menu-options'),
+    # path('api/dropdown-menu-options/select/', views.DropdownMenuOptionSelectView.as_view(), name='dropdown-menu-options-select'),
 ]
