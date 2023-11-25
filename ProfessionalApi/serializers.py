@@ -82,19 +82,30 @@ class PrivateInvitationSerializer(serializers.ModelSerializer):
         model = private_invitation
         fields = '__all__'
 class ProfessionalDashboardSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = professional
         fields = '__all__'
+
+
 
 class ProfessionalSerializer(serializers.ModelSerializer):
     class Meta:
         model = professional
         fields = ('id', 'invitation_preference')
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model=User
+        fields="__all__"
 
 class UserProfileSerializer(serializers.ModelSerializer):
+    professional_user=UserSerializer(read_only=True)
+    # user_id = serializers.SerializerMethodField()
     class Meta:
         model = professional
         fields = '__all__'
+
+
 class CertificateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Certificate
@@ -103,15 +114,17 @@ class ProfessionalSubmissionSerialiser(serializers.ModelSerializer):
     class Meta:
         model = submission
         fields = '__all__'
-class UserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model=User
-        fields=["username","first_name","last_name","email"]
+
+
 class ProfessionalDashbordserializer(serializers.ModelSerializer):
     professional_user=UserSerializer(read_only=True)
+    user_id = serializers.SerializerMethodField()
+
     class Meta:
         model=professional
-        fields=['professional_user','phone','profile_picture','profile_description','resume','reward','optional_email','interst','invitation_preference']
+        fields=['user_id','professional_user','phone','profile_picture','profile_description','resume','reward','optional_email','interst','invitation_preference']
+    def get_user_id(self, obj):
+        return obj.professional_user.id
 
 class ProfessionalFavouriteProgramSerializer(serializers.ModelSerializer):
     program_id=CompanyProgramSerializer(read_only=True)
@@ -245,3 +258,32 @@ class ProfessionalTestSerializer(serializers.ModelSerializer):
     class Meta:
         model=professional_test
         fields=['question','answer']
+
+class ProfessionalSerializer(serializers.ModelSerializer):
+    professional_user=UserSerializer(read_only=True)
+    user_id = serializers.SerializerMethodField()
+    class Meta:
+        model = professional
+        fields = '__all__'
+
+    def get_user_id(self, obj):
+        return obj.professional_user.id
+
+class FollowerSerializer(serializers.ModelSerializer):
+    professional = ProfessionalSerializer()
+    class Meta:
+        model = Follower
+        fields = '__all__'
+
+class UpdateProfessionalSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = professional
+        fields = '__all__'
+class UserProfileUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = professional
+        fields = '__all__'
+# class UserProfileUpdateSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = UserProfile
+#         fields = ['name', 'username', 'website_link', 'location', 'country', 'language', 'about_me', 'profile_picture']

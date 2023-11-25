@@ -7,8 +7,8 @@ urlpatterns = [
     path('programs/',views.ProfessionalProgramAPIView.as_view()),
     path('program/details/<int:pk>',views.ProfessionalProgramDetailsAPIView.as_view()),
     path('submission/',views.ProfessionalSubmissionAPIView.as_view()),
-    # path('professionals/<int:pk>/update_invitation_preference/', views.UpdateInvitationPreferenceAPIView.as_view(), name='professional-update-invitation-preference'),
-    # path('professionals/filter_by_invitation_preference/', views.FilterProfessionalsByInvitationPreferenceAPIView.as_view(), name='professional-filter-by-invitation-preference'),
+    path('professionals/<int:pk>/update_invitation_preference/', views.UpdateInvitationPreferenceAPIView.as_view(), name='professional-update-invitation-preference'),
+    path('professionals/filter_by_invitation_preference/', views.FilterProfessionalsByInvitationPreferenceAPIView.as_view(), name='professional-filter-by-invitation-preference'),
     path('submission-details/', views.ProfessionalSubmissionDetailsAPIView.as_view(), name='submission-details'),
     path('submission/details/<int:pk>',views.ProfessionalSubmissionDetailsAPIView.as_view()),
     path('leaderboard/',views.ProfessionalLearderAPIView.as_view()),
@@ -43,4 +43,7 @@ urlpatterns = [
     path('followed-user/<int:followed_id>/', views.FollowedUserProfileAPIView.as_view(), name='followed-user-profile'),
     path('followers-list/', views.FollowersListAPIView.as_view(), name='followers-list'),
     path('following-list/', views.FollowingListAPIView.as_view(), name='following-list'),
+    path('update-profile/', views.UpdateUserProfileAndProfessional.as_view(), name='update-profile'),
+    path('get-updated-profile/', views.GetUpdatedUserProfileAndProfessional.as_view(), name='get-updated-profile'),
+    path('search-user/<str:username>/', views.SearchUserByUsername.as_view(), name='search-user-by-username'),
 ]

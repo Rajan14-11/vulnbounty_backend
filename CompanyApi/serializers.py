@@ -163,13 +163,13 @@ class CompanyExtendedUserSerializer(serializers.ModelSerializer):
 class CompanyCreateProgramSerializer(serializers.ModelSerializer):
     class Meta:
         model=companyProgram
-        fields=['slug','title','introduction','vulnerability_concerns','target','out_target','scope_type','severity','expiry_date','visibility','p1_min','p1_max','p2_min','p2_max','p3_min','p3_max','p4_min','p4_max','p5_min','p5_max']
+        fields=['slug','title','introduction','vulnerability_concerns','target','out_target','scope_type','severity','expiry_date','visibility','p1_min','p1_max','p2_min','p2_max','p3_min','p3_max','p4_min','p4_max','p5_min','p5_max','profile_image']
 
 
 class CompanyCreateProgramSaveSerializer(serializers.ModelSerializer):
     class Meta:
         model=companyProgram
-        fields=['slug','title','introduction','vulnerability_concerns','region','visibility','severity','expiry_date']
+        fields=['slug','title','introduction','vulnerability_concerns','region','visibility','severity','expiry_date','profile_image']
 
 class CompanyChangeNameSerializer(serializers.Serializer):
     first_name=serializers.CharField()
@@ -193,13 +193,25 @@ class CompanyWalletHistory(serializers.ModelSerializer):
         model=company_wallet_history
         fields=['company',"amount",'description','recived_from','status','created_at']
 
+class CompanySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = company
+        fields = ['profile_picture']
+
 class CompanyProgramSerializer(serializers.ModelSerializer):
     company_name = serializers.SerializerMethodField()
+    company_profile_picture = serializers.SerializerMethodField()
+
     class Meta:
         model = companyProgram
         exclude = ['company']
+
     def get_company_name(self, obj):
         return obj.company.username
+
+    def get_company_profile_picture(self, obj):
+        return CompanySerializer(obj.company).data['profile_picture']
+
 
 class ProgramCollectionSerializer(serializers.ModelSerializer):
     class Meta:

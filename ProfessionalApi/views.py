@@ -27,6 +27,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth.hashers import make_password
 from rest_framework import viewsets
 from rest_framework.decorators import action
+from django.shortcuts import get_object_or_404
 # Create your views here.
 
 def get_tokens_for_user(user):
@@ -139,11 +140,11 @@ class ProfessionalProgramAPIView(APIView):
 
     def get(self, request):
         professional_obj = professional.objects.get(professional_user=request.user)
-        professional_information_obj = professional_information.objects.get(professional=professional_obj.id)
-        region = professional_information_obj.country_names
+        # professional_information_obj = professional_information.objects.get(professional=professional_obj.id)
+        # region = professional_information_obj.country_names
 
         # Fetch company programs
-        data = companyProgram.objects.all().filter((Q(region='all') | Q(region=region)))
+        data = companyProgram.objects.all().filter((Q(region='all')))
 
         # Fetch invited programs
         invited_program = private_invitation.objects.filter(hunter=professional_obj.id)
@@ -363,34 +364,34 @@ class ProfessionalLearderAPIView(APIView):
 
         return Response(response)
 
-# class UpdateInvitationPreferenceAPIView(viewsets.GenericAPIView):
-#     queryset = professional.objects.all()
-#     serializer_class = ProfessionalSerializer
+class UpdateInvitationPreferenceAPIView(APIView):
+    queryset = professional.objects.all()
+    serializer_class = ProfessionalSerializer
 
-#     def post(self, request, pk=None):
-#         professional = self.get_object()
-#         value = request.data.get('value', None)
+    def post(self, request, pk=None):
+        professional = self.get_object()
+        value = request.data.get('value', None)
 
-#         if value is not None:
-#             professional.invitation_preference = value
-#             professional.save()
-#             return Response({'message': 'Invitation preference updated successfully.'})
-#         else:
-#             return Response({'error': 'Value is required to update invitation preference.'}, status=400)
+        if value is not None:
+            professional.invitation_preference = value
+            professional.save()
+            return Response({'message': 'Invitation preference updated successfully.'})
+        else:
+            return Response({'error': 'Value is required to update invitation preference.'}, status=400)
 
-# class FilterProfessionalsByInvitationPreferenceAPIView(viewsets.GenericAPIView):
-#     queryset = professional.objects.all()
-#     serializer_class = ProfessionalSerializer
+class FilterProfessionalsByInvitationPreferenceAPIView(APIView):
+    queryset = professional.objects.all()
+    serializer_class = ProfessionalSerializer
 
-#     def get(self, request):
-#         value = request.query_params.get('value', None)
+    def get(self, request):
+        value = request.query_params.get('value', None)
 
-#         if value is not None:
-#             professionals = professional.objects.filter(invitation_preference=value)
-#             serializer = ProfessionalSerializer(professionals, many=True)
-#             return Response(serializer.data)
-#         else:
-#             return Response({'error': 'Value is required to filter by invitation preference.'}, status=400)
+        if value is not None:
+            professionals = professional.objects.filter(invitation_preference=value)
+            serializer = ProfessionalSerializer(professionals, many=True)
+            return Response(serializer.data)
+        else:
+            return Response({'error': 'Value is required to filter by invitation preference.'}, status=400)
 
 class FollowProfessionalAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -398,16 +399,28 @@ class FollowProfessionalAPIView(APIView):
     def post(self, request):
         user = request.user
         follower_id = request.data.get('follower_id')
+        # print(f"DEBUG: Received follower_id: {follower_id}")
+        # print(follower_id)
         try:
-            professional_to_follow = professional.objects.get(id=follower_id)
+           user_to_follow = User.objects.get(id=follower_id)
+           professional_to_follow = professional.objects.get(professional_user=user_to_follow)
+        #    print(user_to_follow)
+        #    print(professional_to_follow)
         except professional.DoesNotExist:
-            return Response({"message": "Professional not found"}, status=404)
+            return Response({"message": "Professional not found"}, status=400)
 
-        if user.professional.id == professional_to_follow.id:
-            return Response({"message": "You cannot follow yourself"}, status=400)
+        # try:
+
+        #     print(user_professional)
+        #     print(user_professional.id)
+        # except professional.DoesNotExist:
+        #     return Response({"message": "User does not have a professional profile"}, status=400)
+        user_professional = user.professional_user.get()
+        if user_professional.id == professional_to_follow.id:
+            return Response({"message": "You cannot follow yourself"}, status=200)
 
         if Follower.objects.filter(user=user, professional=professional_to_follow).exists():
-            return Response({"message": "You are already following this professional"}, status=400)
+            return Response({"message": "You are already following this professional"}, status=200)
 
         Follower.objects.create(user=user, professional=professional_to_follow)
 
@@ -421,7 +434,8 @@ class UnfollowProfessionalAPIView(APIView):
         unfollow_id = request.data.get('unfollow_id')
 
         try:
-            professional_to_unfollow = professional.objects.get(id=unfollow_id)
+           user_to_follow = User.objects.get(id=unfollow_id)
+           professional_to_unfollow = professional.objects.get(professional_user=user_to_follow)
         except professional.DoesNotExist:
             return Response({"message": "Professional not found"}, status=404)
 
@@ -465,8 +479,14 @@ class FollowersListAPIView(APIView):
 
     def get(self, request):
         user = request.user
-        followers = Follower.objects.filter(professional=user.professional).select_related('user')
-        serializer = UserProfileSerializer(followers, many=True)
+        try:
+            professional_user = user.professional_user.get()
+        except professional.DoesNotExist:
+            return Response({"followers": []})
+
+        # print(Follower.objects.get())
+        followers = Follower.objects.filter(professional=professional_user).select_related('professional')
+        serializer = FollowerSerializer(followers, many=True)
         return Response({"followers": serializer.data})
 
 class FollowingListAPIView(APIView):
@@ -475,9 +495,42 @@ class FollowingListAPIView(APIView):
     def get(self, request):
         user = request.user
         following = Follower.objects.filter(user=user).select_related('professional')
-        serializer = UserProfileSerializer(following, many=True)
+        serializer = FollowerSerializer(following, many=True)  # Use FollowerSerializer here
         return Response({"following": serializer.data})
 
+class SearchUserByUsername(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, username):
+        user = get_object_or_404(User, username=username)
+        try:
+            # submissions=submission.objects.filter(program__company=request.user.id)
+            # print(submissions)
+            profile_instance = professional.objects.get(professional_user=user)
+        except professional.DoesNotExist:
+            return Response({"message": "User not found in Professional model"}, status=404)
+
+        serializer = UserProfileSerializer(profile_instance)
+        return Response(serializer.data)
+
+class GetUpdatedUserProfileAndProfessional(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        profile_instance = UserProfile.objects.get(user=user)
+        professional_instance = professional.objects.get(professional_user=user)
+
+        profile_serializer = UserProfileUpdateSerializer(profile_instance)
+        professional_serializer = UpdateProfessionalSerializer(professional_instance)
+
+        profile_data = profile_serializer.data
+        professional_data = professional_serializer.data
+
+        return Response({
+            "profile": profile_data,
+            "professional": professional_data
+        })
 class RemoveUserFromLeaderboardAPIView(APIView):
     renderer_classes = [UserRender]
     permission_classes = [IsAuthenticated]
@@ -792,10 +845,6 @@ class ProfessionalSettingsUploadPictureAPIView(APIView):
         serializer =ProfessionalUpdateimageSerializer(data ,data=request.data,partial=True)
         if serializer.is_valid():
             try:
-                profile_image=request.POST.get('profile_image')
-                _format, _dataurl =profile_image.split(';base64,')
-                _filename, _extension   = secrets.token_hex(20), _format.split('/')[-1]
-                file = ContentFile( base64.b64decode(_dataurl), name=f"{_filename}.{_extension}")
                 if data.profile_picture == 'Null':
                     serializer.save()
                     message="Successfully updated !"
@@ -1026,3 +1075,25 @@ class ProfessionalTestUpdateAPIView(APIView):
 #                 except:
 #                     message="Something went Wrong retry again"
 
+class UpdateUserProfileAndProfessional(APIView):
+   permission_classes = [IsAuthenticated]
+
+   def post(self, request):
+        user = request.user
+        profile_instance, created = UserProfile.objects.get_or_create(user=user)
+        professional_instance, prof_created = professional.objects.get_or_create(professional_user=user)
+
+
+        profile_serializer = UserProfileUpdateSerializer(profile_instance, data=request.data, partial=True)
+        if profile_serializer.is_valid():
+            profile_instance = profile_serializer.save()
+
+            professional_serializer = UpdateProfessionalSerializer(professional_instance, data=request.data, partial=True)
+            if professional_serializer.is_valid():
+                professional_serializer.save()
+
+                return Response({"message": "Profile updated successfully"})
+            else:
+                return Response(professional_serializer.errors, status=400)
+        else:
+            return Response(profile_serializer.errors, status=400)
