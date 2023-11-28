@@ -46,4 +46,7 @@ urlpatterns = [
     path('update-profile/', views.UpdateUserProfileAndProfessional.as_view(), name='update-profile'),
     path('get-updated-profile/', views.GetUpdatedUserProfileAndProfessional.as_view(), name='get-updated-profile'),
     path('search-user/<str:username>/', views.SearchUserByUsername.as_view(), name='search-user-by-username'),
+    path('user-responses/', views.UserResponseAPIView.as_view(), name='user-responses'),
+    path('companies/', views.UnifiedCompanyAPIView.as_view(), name='companies'),
+    path('api/programs/', views.CompanyProgramListAPIView.as_view(), name='program-list'),
 ]

@@ -28,6 +28,9 @@ from django.contrib.auth.hashers import make_password
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from CompanyApi.models import company
+
 # Create your views here.
 
 def get_tokens_for_user(user):
@@ -1097,3 +1100,99 @@ class UpdateUserProfileAndProfessional(APIView):
                 return Response(professional_serializer.errors, status=400)
         else:
             return Response(profile_serializer.errors, status=400)
+
+class UserResponseAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        data = request.data
+
+        serializer = UserResponseSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save(user=user)
+            return Response({'message': 'User responses saved successfully'}, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class UnifiedCompanyAPIView(APIView):
+    renderer_classes = [UserRender]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            request_data = request.query_params.copy()
+
+            # Fetch companyProgram data if 'time_range' query parameter is present
+            company_programs = None
+            if 'time_range' in request_data:
+                # time_range = request_data.pop('time_range')
+                time_range = 'week'
+
+                if time_range in ['week', 'month', 'year']:
+                    start_date_program = timezone.now() - timezone.timedelta(days=365)  # Default to showing all programs
+                    if time_range == 'week':
+                        start_date_program -= timezone.timedelta(days=7)
+                    elif time_range == 'month':
+                        start_date_program -= timezone.timedelta(days=30)
+                    elif time_range == 'year':
+                        start_date_program -= timezone.timedelta(days=365)
+
+                    company_programs = companyProgram.objects.filter(created_at__gte=start_date_program)
+
+            # Fetch company dashboard data if no 'time_range' query parameter is present
+            if not company_programs:
+                company_user_id = request.user.id
+                company_obj = company.objects.get(company_user=company_user_id)
+                submission_today = submission.objects.filter(
+                    program__company=company_user_id, created_at__date=date.today()).count()
+                submission_this_month = submission.objects.filter(
+                    program__company=company_user_id, created_at__month=date.today().month).count()
+                top_hunter = professional.objects.filter(
+                    reward__gte=1).order_by("-reward")[:5]
+                payment_today = payments.objects.filter(
+                    transfer_from=company_obj.id, created_at__date=date.today()).aggregate(Sum('amount'))
+                payment_this_month = payments.objects.filter(
+                    transfer_from=company_obj.id, created_at__month=date.today().month).aggregate(Sum('amount'))
+
+            # Prepare and return response data
+            message = "success"
+            response_data = {
+                "message": message,
+                "data": {
+                    # Include companyProgram data if available
+                    "company_programs": companyProgram(company_programs, many=True).data if company_programs else {},
+
+                    # Include company dashboard data
+                    "submission_today": submission_today,
+                    "submission_this_month": submission_this_month,
+                    "top_hunter": ProfessionalDashbordserializer(top_hunter, many=True).data,
+                    "payment_today": payment_today,
+                    "payment_this_month": payment_this_month
+                }
+            }
+
+            return Response(response_data)
+
+        except Exception as e:
+            message = "failed"
+            response = {
+                "message": message,
+                "data": None
+            }
+            return Response(response)
+
+class CompanyProgramListAPIView(APIView):
+    serializer_class = CompanyProgramSerializer
+    def get_queryset(self):
+        time_range = self.request.query_params.get('time_range', 'week')
+        if time_range == 'week':
+            start_date = timezone.now() - timezone.timedelta(days=7)
+        elif time_range == 'month':
+            start_date = timezone.now() - timezone.timedelta(days=30)
+        elif time_range == 'year':
+            start_date = timezone.now() - timezone.timedelta(days=365)
+        else:
+            start_date = timezone.now() - timezone.timedelta(days=365)
+        queryset = companyProgram.objects.filter(created_at__gte=start_date)
+        return queryset

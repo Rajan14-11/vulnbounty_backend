@@ -287,3 +287,8 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer):
 #     class Meta:
 #         model = UserProfile
 #         fields = ['name', 'username', 'website_link', 'location', 'country', 'language', 'about_me', 'profile_picture']
+
+class UserResponseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserResponse
+        fields = '__all__'

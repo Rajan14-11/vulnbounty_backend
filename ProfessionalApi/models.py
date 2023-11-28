@@ -4,6 +4,7 @@ from django.core.validators import validate_image_file_extension
 from django.core.validators import FileExtensionValidator
 from django.conf import settings
 from CompanyApi.models import companyProgram
+from multiselectfield import MultiSelectField
 import uuid
 # Create your models here.
 class professional(models.Model):
@@ -35,6 +36,7 @@ class professional(models.Model):
     twitter_handle = models.CharField(max_length=50, blank=True, null=True)
     hack_the_box_handle = models.CharField(max_length=50, blank=True, null=True)
     intro = models.TextField(blank=True, null=True)
+    employment_type = models.CharField(max_length=40,default="open_for_employemnt")
 
 class professional_skills(models.Model):
     user=models.ForeignKey(professional,on_delete=models.CASCADE)
@@ -130,3 +132,54 @@ class UserProfile(models.Model):
     hack_the_box_handle = models.CharField(max_length=50, blank=True, null=True)
     intro = models.TextField(blank=True, null=True)
     profile_picture = models.ImageField(blank=True, null=True, upload_to='user_profiles/', default='default_profile_picture.png')
+
+class UserResponse(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    question_1 = models.CharField(max_length=10, choices=[
+        ('CTF', 'CTF'),
+        ('VDP', 'VDP'),
+        ('BBP', 'BBP'),
+        ('Challenge', 'Challenge'),
+        ('pentest', 'pentest'),
+    ])
+    question_2 = models.CharField(max_length=10, choices=[
+        ('Novice', 'Novice'),
+        ('Starter', 'Starter'),
+        ('Advanced', 'Advanced'),
+        ('Expert', 'Expert'),
+        ('Legend', 'Legend'),
+    ])
+    question_3 = models.CharField(max_length=50, choices=[
+        ('DOMAIN', 'DOMAIN'),
+        ('URL', 'URL'),
+        ('IP ADDRESS', 'IP ADDRESS'),
+        ('CIDR', 'CIDR'),
+        ('IOS:APP STORE', 'IOS:APP STORE'),
+        ('IOS TESTFLIGHT', 'IOS TESTFLIGHT'),
+        ('IOS:IPA', 'IOS:IPA'),
+        ('ANDROID PLAYSTORE', 'ANDROID PLAYSTORE'),
+        ('ANDROID APK', 'ANDROID APK'),
+        ('WINDOWS:MICROSOFT STORE', 'WINDOWS:MICROSOFT STORE'),
+        ('SOURCE CODE', 'SOURCE CODE'),
+        ('EXECUTABLE', 'EXECUTABLE'),
+        ('HARDWARE:IOT', 'HARDWARE:IOT'),
+        ('SMART CONTRACT', 'SMART CONTRACT'),
+        ('WILDCARD', 'WILDCARD'),
+    ])
+    question_4 = models.CharField(max_length=20, choices=[
+        ('Full time', 'Full time'),
+        ('Part time', 'Part time'),
+        ('Occasionally', 'Occasionally'),
+    ])
+    question_5 = MultiSelectField(max_length=100, choices=[
+        ('information_disclosure', 'Information Disclosure'),
+        ('improper_authentication_generic', 'Improper Authentication - Generic'),
+        ('cross_site_scripting_reflected', 'Cross-Site Scripting (XSS) - Reflected'),
+        ('violation_secure_design_principles', 'Violation of Secure Design Principles'),
+        ('improper_access_control_generics', 'Improper Access Control - Generics'),
+        ('cross_site_scripting_generics', 'Cross-Site Scripting (XSS) - Generics'),
+        ('cross_site_request_forgery', 'Cross-Site Request Forgery (CSRF)'),
+        ('open_redirect', 'Open Redirect'),
+        ('cross_site_scripting_stored', 'Cross-Site Scripting (XSS) - Stored'),
+        ('privilege_escalation', 'Privilege Escalation'),
+    ])
