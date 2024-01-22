@@ -5,10 +5,13 @@ from django.core.validators import FileExtensionValidator
 from django.conf import settings
 from CompanyApi.models import companyProgram
 from multiselectfield import MultiSelectField
+from django.core.exceptions import ObjectDoesNotExist
+from django.apps import apps
+from django.utils import timezone
 import uuid
 # Create your models here.
 class professional(models.Model):
-    professional_user = models.ForeignKey(User,related_name='professional_user',on_delete=models.CASCADE)
+    professional_user = models.OneToOneField(User,related_name='professional_user',on_delete=models.CASCADE)
     phone=models.IntegerField(null = True)
     profile_picture=models.ImageField(null = True,blank = True,upload_to='professional/images/profile_picture',default='Null',validators=[validate_image_file_extension])
     profile_description=models.CharField(null = True,max_length=60)
@@ -111,6 +114,10 @@ class professional_login_details(models.Model):
 class professional_favourite_program(models.Model):
     professional = models.ForeignKey(professional,on_delete=models.CASCADE)
     program_id =models.ForeignKey(companyProgram,on_delete=models.CASCADE)
+    # program_id = models.ForeignKey(
+    #     apps.get_model(settings.COMPANY_APP_LABEL, 'companyProgram'),
+    #     on_delete=models.CASCADE,
+    # )
 
 class professional_test(models.Model):
     question=models.TextField()
@@ -133,53 +140,60 @@ class UserProfile(models.Model):
     intro = models.TextField(blank=True, null=True)
     profile_picture = models.ImageField(blank=True, null=True, upload_to='user_profiles/', default='default_profile_picture.png')
 
-class UserResponse(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    question_1 = models.CharField(max_length=10, choices=[
-        ('CTF', 'CTF'),
-        ('VDP', 'VDP'),
-        ('BBP', 'BBP'),
-        ('Challenge', 'Challenge'),
-        ('pentest', 'pentest'),
-    ])
-    question_2 = models.CharField(max_length=10, choices=[
-        ('Novice', 'Novice'),
-        ('Starter', 'Starter'),
-        ('Advanced', 'Advanced'),
-        ('Expert', 'Expert'),
-        ('Legend', 'Legend'),
-    ])
-    question_3 = models.CharField(max_length=50, choices=[
-        ('DOMAIN', 'DOMAIN'),
-        ('URL', 'URL'),
-        ('IP ADDRESS', 'IP ADDRESS'),
-        ('CIDR', 'CIDR'),
-        ('IOS:APP STORE', 'IOS:APP STORE'),
-        ('IOS TESTFLIGHT', 'IOS TESTFLIGHT'),
-        ('IOS:IPA', 'IOS:IPA'),
-        ('ANDROID PLAYSTORE', 'ANDROID PLAYSTORE'),
-        ('ANDROID APK', 'ANDROID APK'),
-        ('WINDOWS:MICROSOFT STORE', 'WINDOWS:MICROSOFT STORE'),
-        ('SOURCE CODE', 'SOURCE CODE'),
-        ('EXECUTABLE', 'EXECUTABLE'),
-        ('HARDWARE:IOT', 'HARDWARE:IOT'),
-        ('SMART CONTRACT', 'SMART CONTRACT'),
-        ('WILDCARD', 'WILDCARD'),
-    ])
-    question_4 = models.CharField(max_length=20, choices=[
-        ('Full time', 'Full time'),
-        ('Part time', 'Part time'),
-        ('Occasionally', 'Occasionally'),
-    ])
-    question_5 = MultiSelectField(max_length=100, choices=[
-        ('information_disclosure', 'Information Disclosure'),
-        ('improper_authentication_generic', 'Improper Authentication - Generic'),
-        ('cross_site_scripting_reflected', 'Cross-Site Scripting (XSS) - Reflected'),
-        ('violation_secure_design_principles', 'Violation of Secure Design Principles'),
-        ('improper_access_control_generics', 'Improper Access Control - Generics'),
-        ('cross_site_scripting_generics', 'Cross-Site Scripting (XSS) - Generics'),
-        ('cross_site_request_forgery', 'Cross-Site Request Forgery (CSRF)'),
-        ('open_redirect', 'Open Redirect'),
-        ('cross_site_scripting_stored', 'Cross-Site Scripting (XSS) - Stored'),
-        ('privilege_escalation', 'Privilege Escalation'),
-    ])
+class UserSelection(models.Model):
+    question_1 = models.JSONField(null=True)
+    question_2 = models.CharField(max_length=255, null=True)
+    question_3 = models.JSONField(null=True)
+    question_4 = models.CharField(max_length=255, null=True)
+    question_5 = models.JSONField(null=True)
+
+class ProfessionalBankDetail(models.Model):
+    professional = models.ForeignKey(professional, on_delete=models.CASCADE, related_name='bank_details')
+    account_number = models.CharField(max_length=255)
+    bank_name = models.CharField(max_length=255)
+    account_holder_name = models.CharField(max_length=255)
+    balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)
+
+class ProfessionalWalletManager(models.Manager):
+    def get_wallet(self, professional):
+        try:
+            return self.get(professional=professional)
+        except ObjectDoesNotExist:
+            return None
+
+class ProfessionalWallet(models.Model):
+    balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)
+    professional = models.OneToOneField(professional, on_delete=models.CASCADE, related_name='wallet')
+
+    objects = ProfessionalWalletManager()
+
+
+class Streak(models.Model):
+    user = models.OneToOneField(
+        professional, on_delete=models.CASCADE, related_name='streak')
+    current_streak = models.IntegerField(default=0)
+    longest_streak = models.IntegerField(default=0)
+    last_update_date = models.DateField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user.professional_user.username}'s Streak"
+
+    def update_streak(self):
+        today = timezone.now().date()
+
+        # Check if the gap is more than 30 days or if the streak is already at 12
+        if (today - self.last_update_date).days > 30 or self.current_streak >= 12:
+            # Reset the current_streak to 1
+            self.current_streak = 1
+        else:
+            # Increment the current_streak
+            self.current_streak += 1
+
+        # Update the longest_streak
+        self.longest_streak = max(self.longest_streak, self.current_streak)
+
+        # Update the last_update_date
+        self.last_update_date = today
+
+        # Save the changes
+        self.save()

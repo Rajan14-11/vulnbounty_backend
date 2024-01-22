@@ -2,9 +2,9 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from .models import *
-from CompanyApi.models import companyProgram,submission
+from CompanyApi.models import companyProgram,submission,ScopeEntry
 from django.db.models import Q
-from CompanyApi.serializers import CompanyProgramSerializer,CompanySubmissionSerializer
+from CompanyApi.serializers import CompanyProgramSerializer,CompanySubmissionSerializer,ScopeEntrySerializer
 from django.contrib.auth.models import User
 from .serializers import *
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -19,6 +19,7 @@ from django.conf import settings
 from datetime import date
 import requests
 import json
+import generics
 from CompanyApi.models import payments
 from django.db.models import Sum
 from .renderers import UserRender
@@ -30,6 +31,11 @@ from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from CompanyApi.models import company
+from decimal import Decimal
+from django.core.exceptions import ObjectDoesNotExist
+import stripe
+stripe.api_key = settings.STRIPE_SECRET_KEY
+
 
 # Create your views here.
 
@@ -64,78 +70,151 @@ class ProfessionalRegisterAPIView(APIView):
             return Response(message)
 
 class ProfessionalDashboardAPIView(APIView):
-    renderer_classes=[UserRender]
-    permission_classes=[IsAuthenticated]
-    def get(self,request):
-        try:
-            submission_today=submission.objects.filter(user=request.user.id,created_at__date=date.today()).count()
-            submission_this_month=submission.objects.filter(user=request.user.id,created_at__month=date.today().month).count()
-            leaderboard= professional.objects.filter(reward__gte=1).order_by('-reward')[:5]
-            program=companyProgram.objects.filter(created_at=date.today())[:5]
-            payment_today = payments.objects.filter(transfer_to=request.user.id,created_at__date=date.today()).aggregate(Sum('amount'))
-            payment_this_month=payments.objects.filter(transfer_to =request.user.id,created_at__month=date.today().month).aggregate(Sum('amount'))
-
-            response={
-                "message":'success',
-                "data":{'user':request.user.username,
-            "submission_today":submission_today,
-            "submission_this_month":submission_this_month,
-            "top_hunter":ProfessionalDashbordserializer(leaderboard,many=True).data,
-            "program":CompanyProgramSerializer(program,many=True).data,
-            "payment_today":payment_today,
-            "payment_this_month":payment_this_month
-            }}
-        except Exception as e:
-            print(e)
-            response={
-                "message":"Failed",
-                "data":None
-            }
-        return Response(response)
-
-class QuizAPIView(APIView):
     renderer_classes = [UserRender]
     permission_classes = [IsAuthenticated]
 
-    def post(self, request):
-        questions_data = request.data.get('questions', [])
+    serializer_class = CompanyProgramSerializer
 
-        user_answers = []
+    def get(self, request, *args, **kwargs):
+        try:
+            time_range = request.GET.get('time_range', 'week')
+            start_date = None
 
-        for question_data in questions_data:
-            question_id = question_data.get('question_id')
-            user_answer = question_data.get('user_answer')
+            if time_range == 'week':
+                # Check if programs for this week exist
+                week_programs = companyProgram.objects.filter(created_at__gte=timezone.now() - timezone.timedelta(days=7))
+                if week_programs.exists():
+                    start_date = timezone.now() - timezone.timedelta(days=7)
+                else:
+                    # If no programs for this week, use last month
+                    start_date = timezone.now() - timezone.timedelta(days=30)
+            elif time_range == 'month':
+                # Check if programs for this month exist
+                month_programs = companyProgram.objects.filter(created_at__gte=timezone.now() - timezone.timedelta(days=30))
+                if month_programs.exists():
+                    start_date = timezone.now() - timezone.timedelta(days=30)
+                else:
+                    # If no programs for this month, use last year
+                    start_date = timezone.now() - timezone.timedelta(days=365)
+            elif time_range == 'year':
+                # Check if programs for this year exist
+                year_programs = companyProgram.objects.filter(created_at__gte=timezone.now() - timezone.timedelta(days=365))
+                if year_programs.exists():
+                    start_date = timezone.now() - timezone.timedelta(days=365)
+                else:
+                    # If no programs for this year, use last year
+                    start_date = timezone.now() - timezone.timedelta(days=365)
+            elif time_range == 'today':
+                start_date = timezone.now() - timezone.timedelta(days=7)
+            else:
+                start_date = timezone.now() - timezone.timedelta(days=365)
 
-            try:
-                question = QuizQuestion.objects.get(id=question_id)
-            except QuizQuestion.DoesNotExist:
-                return Response({"message": f"Question with id {question_id} not found"}, status=status.HTTP_404_NOT_FOUND)
+            company_programs = companyProgram.objects.filter(created_at__gte=start_date)
+            company_program_data = CompanyProgramSerializer(company_programs, many=True).data
 
-            user_answers.append({
-                'question': question.id,
-                'user_answer': user_answer
-            })
+            submission_today = submission.objects.filter(
+                user=request.user.id,
+                created_at__date=date.today()
+            ).count()
 
-            UserAnswer.objects.create(user=request.user, question=question, user_answer=user_answer)
+            submission_this_month = submission.objects.filter(
+                user=request.user.id,
+                created_at__month=date.today().month
+            ).count()
 
-        # Calculate score
-        correct_answers = UserAnswer.objects.filter(
-            user=request.user,
-            question__correct_answer=models.F('user_answer')
-        ).count()
+            leaderboard = professional.objects.filter(
+                reward__gte=1
+            ).order_by('-reward')[:5]
 
-        total_questions = len(questions_data)
-        score = (correct_answers / total_questions) * 100
+            leaderboard_data = ProfessionalDashbordserializer(leaderboard, many=True).data
 
-        response_data = {
-            'message': 'Answers submitted successfully',
-            'score': score,
-            'correct_answers': correct_answers,
-            'total_questions': total_questions,
-            'user_answers': user_answers,
-        }
+            payment_today = payments.objects.filter(
+                transfer_to=request.user.id,
+                created_at__date=date.today()
+            ).aggregate(Sum('amount'))
 
-        return Response(response_data, status=status.HTTP_200_OK)
+            payment_this_month = payments.objects.filter(
+                transfer_to=request.user.id,
+                created_at__month=date.today().month
+            ).aggregate(Sum('amount'))
+
+            response = {
+                "message": 'success',
+                "data": {
+                    'user': request.user.username,
+
+                    # Submission data
+                    "submission_today": submission_today,
+                    "submission_this_month": submission_this_month,
+
+                    # Leaderboard data
+                    "top_hunter": leaderboard_data,
+
+                    # Company program data
+                    "program": company_program_data,
+
+                    # Payment data
+                    "payment_today": payment_today,
+                    "payment_this_month": payment_this_month
+                }
+            }
+        except Exception as e:
+            print(e)
+            response = {
+                "message": "Failed",
+                "data": None
+            }
+
+        return Response(response)
+
+# class QuizAPIView(APIView):
+#     renderer_classes = [UserRender]
+#     permission_classes = [IsAuthenticated]
+
+#     def post(self, request):
+#         questions_data = request.data.get('questions', [])
+
+#         user_answers = []
+
+#         for question_data in questions_data:
+#             question_id = question_data.get('question_id')
+#             user_answer = question_data.get('user_answer')
+
+#             try:
+#                 question = QuizQuestion.objects.get(id=question_id)
+#             except QuizQuestion.DoesNotExist:
+#                 return Response({"message": f"Question with id {question_id} not found"}, status=status.HTTP_404_NOT_FOUND)
+
+#             user_answers.append({
+#                 'question': question.id,
+#                 'user_answer': user_answer
+#             })
+
+#             UserAnswer.objects.create(user=request.user, question=question, user_answer=user_answer)
+
+#         # Calculate score
+#         correct_answers = UserAnswer.objects.filter(
+#             user=request.user,
+#             question__correct_answer=models.F('user_answer')
+#         ).count()
+
+#         total_questions = len(questions_data)
+
+#         # Avoid division by zero
+#         if total_questions > 0:
+#             score = (correct_answers / total_questions) * 100
+#         else:
+#             score = 0
+
+#         response_data = {
+#             'message': 'Answers submitted successfully',
+#             'score': score,
+#             'correct_answers': correct_answers,
+#             'total_questions': total_questions,
+#             'user_answers': user_answers,
+#         }
+
+#         return Response(response_data, status=status.HTTP_200_OK)
 
 class ProfessionalProgramAPIView(APIView):
     renderer_classes = [UserRender]
@@ -277,23 +356,46 @@ class ProfessionalSubmissionAPIView(APIView):
         }
 
         return Response(response)
-    def post(self,request):
-        serializer=ProfessionalprogramSubmissionSerializer(data=request.data)
-        if  serializer.is_valid():
-            program_obj=companyProgram.objects.get(id=serializer.data['program_id'])
-            if submission.objects.filter(program=program_obj,user=request.user).exists():
-                return Response({"message":"already done"})
+
+    def post(self, request):
+        serializer = ProfessionalprogramSubmissionSerializer(data=request.data)
+
+        if serializer.is_valid():
+            program_id = serializer.validated_data.get('program_id')
+            title = serializer.validated_data.get('title')
+            report = serializer.validated_data.get('report')
+
+            try:
+                program_obj = companyProgram.objects.get(id=program_id)
+            except ObjectDoesNotExist:
+                return Response({"message": "Program not found"}, status=404)
+
+            if submission.objects.filter(program=program_obj, user=request.user).exists():
+                return Response({"message": "Already submitted for this program"})
             else:
-                user = submission.objects.create(
-                title=serializer.data['title'],
-                report=serializer.data['report'],
-                program=program_obj,
-                user=request.user)
-                message="success"
-            return Response({"message":message})
+                user_submission_data = {
+                    'user': request.user,
+                    'program': program_obj,
+                    'title': title,
+                    'report': report,
+                    'severity': serializer.validated_data.get('severity'),
+                    'description': serializer.validated_data.get('description'),
+                    'impact': serializer.validated_data.get('impact'),
+                    'asset': serializer.validated_data.get('asset'),
+                    'weakness': serializer.validated_data.get('weakness'),
+                    'status': 'pending',  # Set your default value for status
+                    'payment_status': serializer.validated_data.get('payment_status'),
+                    'payment_amount': serializer.validated_data.get('payment_amount'),
+                    'location': serializer.validated_data.get('location'),
+                }
+
+                user_submission = submission.objects.create(**user_submission_data)
+
+                message = "Success"
+                return Response({"message": message})
         else:
-            message=error_handle(serializer.errors)
-            return Response(message)
+            message = error_handle(serializer.errors)
+            return Response({"message": message}, status=400)
 
 
 class ResumeUploadAPIView(APIView):
@@ -367,20 +469,20 @@ class ProfessionalLearderAPIView(APIView):
 
         return Response(response)
 
+
 class UpdateInvitationPreferenceAPIView(APIView):
-    queryset = professional.objects.all()
     serializer_class = ProfessionalSerializer
 
     def post(self, request, pk=None):
-        professional = self.get_object()
+        professional_instance = get_object_or_404(professional, pk=pk)
         value = request.data.get('value', None)
 
         if value is not None:
-            professional.invitation_preference = value
-            professional.save()
+            professional_instance.invitation_preference = value
+            professional_instance.save()
             return Response({'message': 'Invitation preference updated successfully.'})
         else:
-            return Response({'error': 'Value is required to update invitation preference.'}, status=400)
+            return Response({'error': 'Value is required to update invitation preference.'}, status=status.HTTP_400_BAD_REQUEST)
 
 class FilterProfessionalsByInvitationPreferenceAPIView(APIView):
     queryset = professional.objects.all()
@@ -477,20 +579,42 @@ class FollowedUserProfileAPIView(APIView):
         except professional.DoesNotExist:
             return Response({"message": "Followed user not found"}, status=404)
 
+# class FollowersListAPIView(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def get(self, request):
+#         user = request.user
+#         try:
+#             professional_user = user.professional_user.get()
+#         except professional.DoesNotExist:
+#             return Response({"followers": []})
+
+#         # print(Follower.objects.get())
+#         followers = Follower.objects.filter(professional=professional_user).select_related('professional')
+#         serializer = FollowerSerializer(followers, many=True)
+#         return Response({"followers": serializer.data})
+
 class FollowersListAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         user = request.user
         try:
-            professional_user = user.professional_user.get()
+            professional_instance = user.professional_user.get()
         except professional.DoesNotExist:
             return Response({"followers": []})
 
-        # print(Follower.objects.get())
-        followers = Follower.objects.filter(professional=professional_user).select_related('professional')
-        serializer = FollowerSerializer(followers, many=True)
-        return Response({"followers": serializer.data})
+        # Reverse the relationship to get followers
+        followers = Follower.objects.filter(professional=professional_instance)
+        serializer = UserProfileSerializer(followers, many=True)
+
+        # Modify the response to include only username and id
+        followers_data = [
+            {"user_id": follower_data["professional_user"]["id"], "username": follower_data["professional_user"]["optional_email"]}
+            for follower_data in serializer.data
+        ]
+
+        return Response({"followers": followers_data})
 
 class FollowingListAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -1101,19 +1225,32 @@ class UpdateUserProfileAndProfessional(APIView):
         else:
             return Response(profile_serializer.errors, status=400)
 
-class UserResponseAPIView(APIView):
-    permission_classes = [IsAuthenticated]
 
-    def post(self, request):
-        user = request.user
-        data = request.data
 
-        serializer = UserResponseSerializer(data=data)
-        if serializer.is_valid():
-            serializer.save(user=user)
-            return Response({'message': 'User responses saved successfully'}, status=status.HTTP_201_CREATED)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+# class UserSelectionViewSet(APIView):
+#     renderer_classes=[UserRender]
+#     permission_classes=[IsAuthenticated]
+#     # def post(self, request):
+#     #     print(request.data)
+#     #     serializer = UserResponseofQuestionSerializer(data=request.data)
+#     #     if serializer.is_valid():
+#     #         serializer.save()
+#     #         return Response(serializer.data, status=status.HTTP_201_CREATED)
+#     #     # return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+#     def post(self, request, *args, **kwargs):
+#         data = request.data  # Assuming the data is provided under the 'data' key
+#         print(data)
+#         serializer = UserResponseofQuestionSerializer(data={'data': data})
+#         if serializer.is_valid():
+#             serializer.save()
+#             return Response(serializer.data, status=status.HTTP_201_CREATED)
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+#     def get(self, request):
+#         user_selections = UserSelection.objects.all()
+#         serializer = UserResponseofQuestionSerializer(user_selections, many=True)
+#         return Response(serializer.data)
 
 class UnifiedCompanyAPIView(APIView):
     renderer_classes = [UserRender]
@@ -1196,3 +1333,195 @@ class CompanyProgramListAPIView(APIView):
             start_date = timezone.now() - timezone.timedelta(days=365)
         queryset = companyProgram.objects.filter(created_at__gte=start_date)
         return queryset
+
+class UserProfileDetailsAPIView(APIView):
+    renderer_classes = [UserRender]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, user_id):
+        try:
+            user_submissions = submission.objects.filter(user=user_id)
+            user_professional = professional.objects.get(professional_user=user_id)
+            user_program_count = submission.objects.filter(program__company=user_id).count()
+
+            total_payment = payments.objects.filter(transfer_from=user_professional.id).aggregate(Sum('amount'))
+
+            user_professional_login_details = professional_login_details.objects.get(professional=user_professional)
+
+            try:
+                user_extend_user = ExtendUser.objects.get(user=user_id)
+            except ExtendUser.DoesNotExist:
+                ExtendUser.objects.create(user=user_id)
+                user_extend_user = ExtendUser.objects.get(user=user_id)
+
+            try:
+                user_validate_number = ValidateNumber.objects.get(user=user_extend_user.id)
+                validate_number_status = "True" if user_validate_number.status else "False"
+            except ValidateNumber.DoesNotExist:
+                user_validate_number = None
+                validate_number_status = "False"
+
+            response = {
+                "message": "success",
+                "data": {
+                    "submissions": CompanySubmissionSerializer(user_submissions, many=True).data,
+                    "professional_details": ProfessionalSettingsSerializer(user_professional).data,
+                    "program_count": user_program_count,
+                    "total_payment": total_payment,
+                    "login_details": ProfessionalLoginDetailsSerializer(user_professional_login_details).data,
+                    "extend_user": ProfessionalExtendedUserSerializer(user_extend_user).data,
+                    "validate_number": user_validate_number,
+                }
+            }
+
+        except Exception as e:
+            response = {
+                "message": "failed",
+                "data": None
+            }
+            print(e)
+
+        return Response(response)
+
+class ProfessionalBankDetailCreateView(APIView):
+    renderer_classes = [UserRender]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        serializer = ProfessionalBankDetailSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(professional=request.user.professional_user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class ProfessionalBankDetailRetrieveView(APIView):
+    renderer_classes = [UserRender]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        # Explicitly use .all() to avoid issues with the related manager
+        bank_details = request.user.professional_user.bank_details.all()
+        serializer = ProfessionalBankDetailSerializer(bank_details, many=True)
+        return Response(serializer.data)
+
+class WithdrawMoneyFromWalletView(APIView):
+    renderer_classes = [UserRender]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        try:
+            amount = Decimal(request.data.get('amount'))
+        except (TypeError, ValueError):
+            return Response({"error": "Invalid amount"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            professional_wallet = ProfessionalWallet.objects.get_wallet(request.user.professional_user)
+        except ProfessionalWallet.DoesNotExist:
+            return Response({"error": "Professional wallet not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if professional_wallet.balance >= amount >= 0:
+            professional_wallet.balance -= amount
+            professional_wallet.save()
+
+            # Create a bank account token (use valid testing numbers)
+            bank_account_token = create_stripe_bank_account_token()
+
+            # Perform the actual payout to the professional's bank account using Stripe API
+            try:
+                bank_account_number = request.user.professional_user.bank_details.first().account_number
+                payout = stripe.Payout.create(
+                    amount=int(amount * 100),  # Amount in cents
+                    currency="usd",  # Change to the appropriate currency
+                    destination=bank_account_number,
+                )
+
+                # Check the status of the payout
+                if payout.status == 'paid':
+                    return Response({"message": "Money withdrawn successfully and added to the bank account"}, status=status.HTTP_200_OK)
+                else:
+                    return Response({"error": "Payout failed"}, status=status.HTTP_400_BAD_REQUEST)
+            except AttributeError:
+                return Response({"error": "Bank details not found"}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            return Response({"error": "Invalid amount or insufficient funds"}, status=status.HTTP_400_BAD_REQUEST)
+
+def create_stripe_bank_account_token():
+    # Use valid testing numbers
+    token = stripe.Token.create(
+        bank_account={
+            "country": "US",
+            "currency": "usd",
+            "account_holder_name": "John Doe",
+            "account_holder_type": "individual",
+            "routing_number": "110000000",
+            "account_number": "000123456789",
+        },
+    )
+    return token.id
+
+class WalletBalanceView(APIView):
+    renderer_classes = [UserRender]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        professional_wallet = ProfessionalWallet.objects.get_wallet(request.user.professional_user)
+
+        if professional_wallet:
+            serializer = ProfessionalWalletSerializer(professional_wallet)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": "Professional wallet not found"}, status=status.HTTP_404_NOT_FOUND)
+class YourView(APIView):
+    def post(self, request, *args, **kwargs):
+        data = request.data  # Assuming the data is provided in the specified format
+        serializer = UserSelectionSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def get(self, request):
+        user_selections = UserSelection.objects.all()
+        serializer = UserSelectionSerializer(user_selections, many=True)
+        return Response(serializer.data)
+
+
+class UserSelectionUpdateView(APIView):
+    def put(self, request, pk, *args, **kwargs):
+        try:
+            user_selection = UserSelection.objects.get(pk=pk)
+        except UserSelection.DoesNotExist:
+            return Response({"message": "User selection not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = UserSelectionSerializer(
+            user_selection, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class StreakAPIView(APIView):
+    def get(self, request, *args, **kwargs):
+        # Retrieve the current user's streak without updating it
+        instance, created = Streak.objects.get_or_create(user=request.user)
+
+        serializer = StreakSerializer(instance)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request, *args, **kwargs):
+        # Update the streak when a POST request is received
+        instance, created = Streak.objects.get_or_create(user=request.user)
+        instance.update_streak()
+        serializer = StreakSerializer(instance)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class CustomScopeEntryListCreateView(APIView):
+    serializer_class = ScopeEntrySerializer
+
+    def get(self, request, *args, **kwargs):
+        program_id = self.kwargs['program_id']
+        scope_entries = ScopeEntry.objects.filter(program_id=program_id)
+        serializer = self.serializer_class(scope_entries, many=True)
+        return Response(serializer.data)
+

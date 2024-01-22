@@ -24,6 +24,9 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = env('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
 
+COMPANY_APP_LABEL = 'companyApi'
+PROFESSIONAL_APP_LABEL = 'professionalApi'
+
 # Twilio
 TWILIO_ACCOUNT_SID=env('TWILIO_ACCOUNT_SID')
 TWILIO_AUTH_TOKEN=env('TWILIO_AUTH_TOKEN')
@@ -45,6 +48,8 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['localhost','*','3.111.40.102']
 
+RAZORPAY_KEY_ID = os.environ.get("RAZORPAY_KEY_ID")
+RAZORPAY_KEY_SECRET = os.environ.get("RAZORPAY_KEY_SECRET")
 
 # Application definition
 
@@ -99,6 +104,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'vulnbounty.wsgi.application'
 
+# DJSTRIPE_FOREIGN_KEY_TO_FIELD = "id"  # or "djstripe_id" depending on your situation
 
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
@@ -170,14 +176,15 @@ STRIPE_PUBLIC_KEY=env('STRIPE_PUBLIC_KEY')
 STRIPE_SECRET_KEY=env('STRIPE_SECRET_KEY')
 STRIPE_WEBHOOK_SECRET=env('STRIPE_WEBHOOK_SECRET')
 
+
 # session cookie
 SESSION_EXPIRE_AFTER_LAST_ACTIVITY = True
-SESSION_EXPIRE_SECONDS = 3600  # 1 hour
+SESSION_EXPIRE_SECONDS = 36000  # 1 hour
 SESSION_TIMEOUT_REDIRECT = '/getstart'
 
 # JWT Settings
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=600),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=2),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
@@ -208,5 +215,6 @@ SIMPLE_JWT = {
 CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://localhost:3000",
+    "http://localhost:3002",
 ]
 # CORS_ALLOW_ALL_ORIGINS=True

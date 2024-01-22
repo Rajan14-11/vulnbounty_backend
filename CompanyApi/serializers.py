@@ -1,11 +1,12 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import companyProgram,DropdownMenuOption,submission,ProgramCollection,company,company_login_details,company_wallet_history
+from .models import companyProgram,DropdownMenuOption,submission,ProgramCollection,company,company_login_details,company_wallet_history,ScopeEntry,CompanyWallet,CompanyBankDetail,Transaction
 from ProfessionalApi.models import professional
 from StudentApi.models import Student
 from MainApi.models import ExtendUser
 from django.core.files.uploadedfile import UploadedFile
 import re
+
 # from rest_framework_recaptcha import ReCaptchaField
 
 
@@ -160,12 +161,19 @@ class CompanyExtendedUserSerializer(serializers.ModelSerializer):
         model=ExtendUser
         fields="__all__"
 
+
 class CompanyCreateProgramSerializer(serializers.ModelSerializer):
     class Meta:
-        model=companyProgram
-        fields=['slug','title','introduction','vulnerability_concerns','target','out_target','scope_type','severity','expiry_date','visibility','p1_min','p1_max','p2_min','p2_max','p3_min','p3_max','p4_min','p4_max','p5_min','p5_max','profile_image']
-
-
+        model = companyProgram
+        fields = [
+            'slug', 'title', 'introduction', 'vulnerability_concerns', 'target', 'out_target',
+            'scope_type',  'expiry_date', 'visibility', 'p1_min', 'p1_max', 'p2_min', 'p2_max',
+            'p3_min', 'p3_max', 'p4_min', 'p4_max', 'p5_min', 'p5_max','policy',
+        ]
+class ScopeEntrySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ScopeEntry
+        fields = ['asset_name','asset_description','type','coverage','max_severity','bounty']
 class CompanyCreateProgramSaveSerializer(serializers.ModelSerializer):
     class Meta:
         model=companyProgram
@@ -255,3 +263,21 @@ class DropdownMenuOptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = DropdownMenuOption
         fields = ('id', 'label', 'value')
+
+# class CompanyBankDetailSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = CompanyBankDetail
+#         fields = ['account_number','bank_name','account_holder_name','balance']
+
+# class CompanyWalletSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = CompanyWallet
+#         fields = '__all__'
+
+# class PaymentSuccessSerializer(serializers.Serializer):
+#     professional_user = serializers.CharField()
+#     amount = serializers.FloatField()
+# class CompanyPaymentSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = Transaction
+#         fields = '__all__'

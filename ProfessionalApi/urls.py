@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from .views import YourView
 
 urlpatterns = [
     path('register/',views.ProfessionalRegisterAPIView.as_view()),
@@ -31,7 +32,7 @@ urlpatterns = [
     path('test_update',views.ProfessionalTestUpdateAPIView.as_view()),
     path('upload/', views.ResumeUploadAPIView.as_view(), name='resume-upload'),
     path('delete/<int:resume_id>/', views.ResumeDeleteAPIView.as_view(), name='resume-delete'),
-    path('quiz/', views.QuizAPIView.as_view(), name='quiz-api'),
+    # path('quiz/', views.QuizAPIView.as_view(), name='quiz-api'),
     path('deactivate_account/', views.DeactivateAccountAPIView.as_view(), name='deactivate_account'),
     path('add_certification/', views.CertificationAPIView.as_view(), name='add_certification'),
     path('certificates/', views.ListCertificatesAPIView.as_view(), name='list_certificates'),
@@ -46,7 +47,18 @@ urlpatterns = [
     path('update-profile/', views.UpdateUserProfileAndProfessional.as_view(), name='update-profile'),
     path('get-updated-profile/', views.GetUpdatedUserProfileAndProfessional.as_view(), name='get-updated-profile'),
     path('search-user/<str:username>/', views.SearchUserByUsername.as_view(), name='search-user-by-username'),
-    path('user-responses/', views.UserResponseAPIView.as_view(), name='user-responses'),
+    path('quiz/', YourView.as_view(), name='user-selection'),
+    path('user-selection-update/<int:pk>/',
+         views.UserSelectionUpdateView.as_view(), name='user-selection-update'),
+    # path('api/get-user-responses/', views.GetUserResponsesAPIView.as_view(), name='get-user-responses'),
     path('companies/', views.UnifiedCompanyAPIView.as_view(), name='companies'),
     path('api/programs/', views.CompanyProgramListAPIView.as_view(), name='program-list'),
+    path('user-profile-details/<int:user_id>/', views.UserProfileDetailsAPIView.as_view(), name='user_profile_details_api'),
+    path('bank-detail/create/', views.ProfessionalBankDetailCreateView.as_view(), name='professional-bank-detail-create'),
+    path('bank-detail/retrieve/', views.ProfessionalBankDetailRetrieveView.as_view(), name='professional-bank-detail-retrieve'),
+    path('withdraw-money-from-wallet/', views.WithdrawMoneyFromWalletView.as_view(), name='withdraw-money-from-wallet'),
+    path('wallet-balance/', views.WalletBalanceView.as_view(), name='wallet-balance'),
+    path('streak/', views.StreakAPIView.as_view(), name='streak-api'),
+    path('custom-scope-entries/<int:program_id>/',
+         views.CustomScopeEntryListCreateView.as_view(), name='custom-scope-entry-list'),
 ]

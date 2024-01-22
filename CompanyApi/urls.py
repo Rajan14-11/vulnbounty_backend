@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path,include
 from . import views
 
 urlpatterns = [
@@ -31,4 +31,14 @@ urlpatterns = [
     # path('create-submission/', views.StoreProgramAPIView.as_view(), name='create-submission'),
     # path('api/dropdown-menu-options/', views.DropdownMenuOptionListView.as_view(), name='dropdown-menu-options'),
     # path('api/dropdown-menu-options/select/', views.DropdownMenuOptionSelectView.as_view(), name='dropdown-menu-options-select'),
+    path('api/program/<int:program_id>/scope/', views.ScopeEntryListCreateView.as_view(), name='scope-entry-list-create'),
+    # path('bank-detail/create/', views.CompanyBankDetailCreateView.as_view(), name='company-bank-detail-create'),
+    # path('bank-detail/retrieve/', views.CompanyBankDetailRetrieveView.as_view(), name='company-bank-detail-retrieve'),
+    # path('add-money-to-wallet/', views.AddMoneyToCompanyWalletView.as_view(), name='add-money-to-company-wallet'),
+    # path('withdraw-money-from-wallet/', views.WithdrawMoneyFromCompanyWalletView.as_view(), name='withdraw-money-from-company-wallet'),
+    # path('transfer-money-to-professional/', views.TransferMoneyToProfessionalView.as_view(), name='transfer-money-to-professional'),
+    # path('company-wallet-details/', views.CompanyWalletDetailsView.as_view(), name='company-wallet-details'),
+    # path('api/payment/', views.PaymentAPIView.as_view(), name='payment_api'),
+    # path('api/process_payment/', views.ProcessPaymentAPIView.as_view(), name='process_payment_api'),
+    path("razorpay/", include("CompanyApi.api.urls"))
 ]

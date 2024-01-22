@@ -136,7 +136,7 @@ class ProfessionalprogramSubmissionSerializer(serializers.ModelSerializer):
     program_id=serializers.IntegerField(required=True)
     class Meta:
         model=submission
-        fields=['title','report','program_id']
+        fields=['title','report','program_id','asset','severity','description','impact','weakness']
 
     def validate_program_id(self,program_id):
         if companyProgram.objects.filter(id=program_id).exists():
@@ -158,11 +158,10 @@ class ProfessionalprogramSubmissionSerializer(serializers.ModelSerializer):
     #     user.save()
 
     #     return user
-class UserAnswerSerializer(serializers.ModelSerializer):
+class UserSelectionSerializer(serializers.ModelSerializer):
     class Meta:
-        model = UserAnswer
-        fields = ['question', 'user_answer']
-
+        model = UserSelection
+        fields = '__all__'
 class ResumeUploadSerializer(serializers.Serializer):
     resume = serializers.FileField()
 
@@ -288,7 +287,19 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer):
 #         model = UserProfile
 #         fields = ['name', 'username', 'website_link', 'location', 'country', 'language', 'about_me', 'profile_picture']
 
-class UserResponseSerializer(serializers.ModelSerializer):
+class ProfessionalBankDetailSerializer(serializers.ModelSerializer):
     class Meta:
-        model = UserResponse
+        model = ProfessionalBankDetail
+        # fields = '__all__'
+        fields = ['account_number','bank_name','account_holder_name','balance']
+
+class ProfessionalWalletSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProfessionalWallet
+        fields = '__all__'
+
+
+class StreakSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Streak
         fields = '__all__'
