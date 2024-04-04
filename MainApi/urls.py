@@ -10,4 +10,6 @@ urlpatterns = [
     path('changepassword/',views.ChangePasswordAPIView.as_view()),
     path('verify_email/',views.EmailVerificationAPIView.as_view()),
     path("logout/",views.Logout.as_view()),
+    path('activate/', views.ActivateAccountAPIView.as_view(),
+         name='activate_account'),
 ]

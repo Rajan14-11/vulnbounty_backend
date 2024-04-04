@@ -19,3 +19,9 @@ class messages(models.Model):
     receiver_id = models.IntegerField()
     text = models.CharField(max_length=1200)
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class UserToken(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    access_token = models.CharField(max_length=500)
+    refresh_token = models.CharField(max_length=500)

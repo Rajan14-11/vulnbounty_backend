@@ -8,6 +8,7 @@ from .models import ValidateNumber
 class LoginSerializer(serializers.Serializer):
     username=serializers.CharField()
     password=serializers.CharField()
+    remember_me = serializers.BooleanField(default=False)
     def validate(self, data):
         username=data.get('username')
         password=data.get('password')
@@ -15,20 +16,26 @@ class LoginSerializer(serializers.Serializer):
             user =authenticate(username=username, password=password)
             if user is not None:
                 if Student.objects.filter(student_user=user.id,email_status=False).exists():
-                    raise serializers.ValidationError("Verify your email to Login") 
+                    raise serializers.ValidationError("Verify your email to Login")
                 elif professional.objects.filter(professional_user=user.id,email_status=False).exists():
-                    raise serializers.ValidationError("Verify  your email to Login") 
+                    raise serializers.ValidationError("Verify  your email to Login")
                 elif company.objects.filter(company_user=user.id,email_status=False).exists():
-                    raise serializers.ValidationError("Verify  your email to Login") 
-                else: 
+                    raise serializers.ValidationError("Verify  your email to Login")
+                else:
                     return data
             else:
                 raise serializers.ValidationError("Username and Password doesn't match")
         else:
             raise serializers.ValidationError("Must include username and password")
-    
-   
-    
+
+    def error_handle(errors):
+        error_messages = []
+        for field, field_errors in errors.items():
+            for error in field_errors:
+                error_messages.append(f"{field}: {error}")
+
+        return {"errors": error_messages}
+
 
 class ValidatePhoneSerializer(serializers.Serializer):
     country_code=serializers.CharField()

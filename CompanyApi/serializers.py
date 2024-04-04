@@ -94,11 +94,31 @@ class ProgramSerializer(serializers.ModelSerializer):
         model=companyProgram
         fields="__all__"
 
+# class CompanyProgramSerializer(serializers.ModelSerializer):
+#     company=UserSerializer(read_only=True)
+#     class Meta:
+#         model=companyProgram
+#         fields="__all__"
+
+
 class CompanyProgramSerializer(serializers.ModelSerializer):
-    company=UserSerializer(read_only=True)
+    company_name = serializers.SerializerMethodField()
+    company_profile_picture = serializers.SerializerMethodField()
+    profile_image = serializers.ImageField(
+        required=False)  # Include the profile image field
+
     class Meta:
-        model=companyProgram
-        fields="__all__"
+        model = companyProgram
+        fields = ['company_name', 'company_profile_picture', 'profile_image', 'slug', 'title', 'introduction', 'vulnerability_concerns', 'region', 'visibility',
+                  'target', 'scope_type', 'out_target', 'p1_min', 'p1_max', 'p2_min', 'p2_max', 'p3_min', 'p3_max',
+                  'p4_min', 'p4_max', 'p5_min', 'p5_max', 'max_reward', 'severity', 'expiry_date', 'posted',
+                  'policy', 'created_at', 'edited_at']
+
+    def get_company_name(self, obj):
+        return obj.company.username
+
+    def get_company_profile_picture(self, obj):
+        return CompanySerializer(obj.company).data.get('profile_picture')
 
 class CompanySubmissionSerializer(serializers.ModelSerializer):
     user=UserSerializer(read_only=True)
@@ -168,7 +188,7 @@ class CompanyCreateProgramSerializer(serializers.ModelSerializer):
         fields = [
             'slug', 'title', 'introduction', 'vulnerability_concerns', 'target', 'out_target',
             'scope_type',  'expiry_date', 'visibility', 'p1_min', 'p1_max', 'p2_min', 'p2_max',
-            'p3_min', 'p3_max', 'p4_min', 'p4_max', 'p5_min', 'p5_max','policy',
+            'p3_min', 'p3_max', 'p4_min', 'p4_max', 'p5_min', 'p5_max', 'policy', 'severity','region'
         ]
 class ScopeEntrySerializer(serializers.ModelSerializer):
     class Meta:
@@ -208,7 +228,7 @@ class CompanySerializer(serializers.ModelSerializer):
 
 class CompanyProgramSerializer(serializers.ModelSerializer):
     company_name = serializers.SerializerMethodField()
-    company_profile_picture = serializers.SerializerMethodField()
+    
 
     class Meta:
         model = companyProgram

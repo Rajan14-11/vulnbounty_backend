@@ -40,6 +40,7 @@ class professional(models.Model):
     hack_the_box_handle = models.CharField(max_length=50, blank=True, null=True)
     intro = models.TextField(blank=True, null=True)
     employment_type = models.CharField(max_length=40,default="open_for_employemnt")
+    questions_completed = models.BooleanField(default=False)
 
 class professional_skills(models.Model):
     user=models.ForeignKey(professional,on_delete=models.CASCADE)
@@ -49,6 +50,8 @@ class private_invitation(models.Model):
     hunter=models.ForeignKey(professional, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
 class Certificate(models.Model):
+    user = models.ForeignKey(professional, on_delete=models.CASCADE, null=True)
+
     certificate_name = models.CharField(max_length=255)
     organisations = models.CharField(max_length=255)
     issues_date = models.DateField()
@@ -141,6 +144,8 @@ class UserProfile(models.Model):
     profile_picture = models.ImageField(blank=True, null=True, upload_to='user_profiles/', default='default_profile_picture.png')
 
 class UserSelection(models.Model):
+    user= models.OneToOneField(
+        professional, on_delete=models.CASCADE,null=True, related_name='user_quiz')
     question_1 = models.JSONField(null=True)
     question_2 = models.CharField(max_length=255, null=True)
     question_3 = models.JSONField(null=True)
@@ -167,33 +172,3 @@ class ProfessionalWallet(models.Model):
 
     objects = ProfessionalWalletManager()
 
-
-class Streak(models.Model):
-    user = models.OneToOneField(
-        professional, on_delete=models.CASCADE, related_name='streak')
-    current_streak = models.IntegerField(default=0)
-    longest_streak = models.IntegerField(default=0)
-    last_update_date = models.DateField(auto_now=True)
-
-    def __str__(self):
-        return f"{self.user.professional_user.username}'s Streak"
-
-    def update_streak(self):
-        today = timezone.now().date()
-
-        # Check if the gap is more than 30 days or if the streak is already at 12
-        if (today - self.last_update_date).days > 30 or self.current_streak >= 12:
-            # Reset the current_streak to 1
-            self.current_streak = 1
-        else:
-            # Increment the current_streak
-            self.current_streak += 1
-
-        # Update the longest_streak
-        self.longest_streak = max(self.longest_streak, self.current_streak)
-
-        # Update the last_update_date
-        self.last_update_date = today
-
-        # Save the changes
-        self.save()

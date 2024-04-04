@@ -46,6 +46,8 @@ class company_login_details(models.Model):
 class companyProgram(models.Model):
     company = models.ForeignKey(User, on_delete=models.CASCADE)
     slug = models.SlugField(max_length=30)
+    profile_image = models.ImageField(
+        upload_to='company_profiles/', null=True, blank=True)
     title = models.CharField(max_length=100, default="Company Name", blank=True)
     introduction = models.TextField(max_length=1000, blank=True, default='A bug bounty program')
     SEVERITY_CHOICES = [
@@ -90,6 +92,7 @@ class companyProgram(models.Model):
     posted = models.BooleanField(default=False)
     created_at = models.DateField(auto_now=True)
     edited_at = models.DateField(auto_now=True)
+
 
 class submission(models.Model):
     user=models.ForeignKey(User,on_delete=models.CASCADE,null=True)

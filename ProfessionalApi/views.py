@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -17,9 +18,6 @@ import os
 from twilio.rest import Client
 from django.conf import settings
 from datetime import date
-import requests
-import json
-import generics
 from CompanyApi.models import payments
 from django.db.models import Sum
 from .renderers import UserRender
@@ -32,10 +30,12 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from CompanyApi.models import company
 from decimal import Decimal
+from django.urls import reverse
+from rest_framework.test import APIClient
 from django.core.exceptions import ObjectDoesNotExist
+from collections import defaultdict
 import stripe
 stripe.api_key = settings.STRIPE_SECRET_KEY
-
 
 # Create your views here.
 
@@ -46,6 +46,55 @@ def get_tokens_for_user(user):
         'refresh': str(refresh),
         'access': str(refresh.access_token),
     }
+
+def calculateStreakforUser(user):
+     streak =0
+     today = datetime.now()
+     start_of_year = today.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+     end_of_year = today.replace(month=12, day=31, hour=23, minute=59, second=59, microsecond=999999)
+     submissions = submission.objects.filter(
+            user=user.professional_user, created_at__gte=start_of_year, created_at__lte=end_of_year).order_by('created_at')
+
+        # Calculate streak
+     streaks = defaultdict(int)
+     current_month = None
+     current_streak = 0
+
+     for sub in submissions.order_by('created_at'):
+        submission_month = sub.created_at.month
+
+        if current_month != submission_month:
+            current_month = submission_month
+            current_streak = 0
+
+        current_streak += 1
+        streaks[submission_month] = max(streaks[submission_month], current_streak)
+
+
+     for month,value in streaks.items():
+
+        if value >=1:
+            streak+=1
+     return streak
+
+
+BADGES = {
+    'streakBadges': [
+        {'name': 'Streak Beginner', 'threshold': 3,
+            'image': 'https://png.pngtree.com/element_pic/00/16/07/18578cd65e6ecaa.jpg'},
+        {'name': 'Streak Intermediate', 'threshold': 7,
+            'image': 'https://png.pngtree.com/element_pic/00/16/07/18578cd65e6ecaa.jpg'},
+        {'name': 'Streak Expert', 'threshold': 12,
+            'image': 'https://png.pngtree.com/element_pic/00/16/07/18578cd65e6ecaa.jpg'},
+    ],
+    'submissionsBadges': [
+        {'name': '5-day Streak Badge', 'image': 'https://png.pngtree.com/element_pic/00/16/07/18578cd65e6ecaa.jpg','threshold':2},
+        {'name': '10-day Streak Badge', 'image': 'https://png.pngtree.com/element_pic/00/16/07/18578cd65e6ecaa.jpg','threshold':3},
+       {'name': '15-day Streak Badge', 'image': 'https://png.pngtree.com/element_pic/00/16/07/18578cd65e6ecaa.jpg','threshold':4},
+        {'name': '20-day Streak Badge', 'image': 'https://png.pngtree.com/element_pic/00/16/07/18578cd65e6ecaa.jpg','threshold':5},
+        {'name': '100-day Streak Badge', 'image': 'https://png.pngtree.com/element_pic/00/16/07/18578cd65e6ecaa.jpg','threshold':6},
+    ]
+}
 
 class ProfessionalRegisterAPIView(APIView):
      renderer_classes=[UserRender]
@@ -167,55 +216,6 @@ class ProfessionalDashboardAPIView(APIView):
 
         return Response(response)
 
-# class QuizAPIView(APIView):
-#     renderer_classes = [UserRender]
-#     permission_classes = [IsAuthenticated]
-
-#     def post(self, request):
-#         questions_data = request.data.get('questions', [])
-
-#         user_answers = []
-
-#         for question_data in questions_data:
-#             question_id = question_data.get('question_id')
-#             user_answer = question_data.get('user_answer')
-
-#             try:
-#                 question = QuizQuestion.objects.get(id=question_id)
-#             except QuizQuestion.DoesNotExist:
-#                 return Response({"message": f"Question with id {question_id} not found"}, status=status.HTTP_404_NOT_FOUND)
-
-#             user_answers.append({
-#                 'question': question.id,
-#                 'user_answer': user_answer
-#             })
-
-#             UserAnswer.objects.create(user=request.user, question=question, user_answer=user_answer)
-
-#         # Calculate score
-#         correct_answers = UserAnswer.objects.filter(
-#             user=request.user,
-#             question__correct_answer=models.F('user_answer')
-#         ).count()
-
-#         total_questions = len(questions_data)
-
-#         # Avoid division by zero
-#         if total_questions > 0:
-#             score = (correct_answers / total_questions) * 100
-#         else:
-#             score = 0
-
-#         response_data = {
-#             'message': 'Answers submitted successfully',
-#             'score': score,
-#             'correct_answers': correct_answers,
-#             'total_questions': total_questions,
-#             'user_answers': user_answers,
-#         }
-
-#         return Response(response_data, status=status.HTTP_200_OK)
-
 class ProfessionalProgramAPIView(APIView):
     renderer_classes = [UserRender]
     permission_classes = [IsAuthenticated]
@@ -223,10 +223,13 @@ class ProfessionalProgramAPIView(APIView):
     def get(self, request):
         professional_obj = professional.objects.get(professional_user=request.user)
         # professional_information_obj = professional_information.objects.get(professional=professional_obj.id)
-        # region = professional_information_obj.country_names
+        region = professional_obj.country
 
-        # Fetch company programs
-        data = companyProgram.objects.all().filter((Q(region='all')))
+        # Fetch company programs excluding expired programs
+        data = companyProgram.objects.filter(
+            # (Q(region= 'all')),
+            expiry_date__gte=timezone.now().date()
+        )
 
         # Fetch invited programs
         invited_program = private_invitation.objects.filter(hunter=professional_obj.id)
@@ -250,10 +253,21 @@ class CertificationAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        serializer = CertificateSerializer(data=request.data)
+        profe_user = professional.objects.get(professional_user=request.user.id)
+        serializer = ProfessionalCertificatesAddSerializer(data=request.data)
 
         if serializer.is_valid():
-            serializer.save()
+            certificate_data={
+               'user':profe_user,
+                'certificate_name':serializer.validated_data.get(u'certificate_name'),
+    'organisations':serializer.validated_data.get('organisations'),
+    'issues_date':serializer.validated_data.get('issues_date'),
+    'expiry_date' :serializer.validated_data.get('expiry_date'),
+    'certificate_id':serializer.validated_data.get('certificate_id'),
+                'certificate_url': serializer.validated_data.get('certificate_url'),
+
+            }
+            Certificate.objects.create(**certificate_data)
             response_data = {
                 'message': 'Certificate added successfully',
                 'certificate_data': serializer.data
@@ -264,8 +278,10 @@ class CertificationAPIView(APIView):
 
 class ListCertificatesAPIView(APIView):
     def get(self, request):
-        certificates = Certificate.objects.all()
-        serializer = CertificateSerializer(certificates, many=True)
+        profe_user = professional.objects.get(
+            professional_user=request.user.id)
+        certificates = Certificate.objects.filter(user=profe_user.id)
+        serializer = ProfessionalCertificatesSerializer(certificates, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 class DeleteCertificateAPIView(APIView):
@@ -306,7 +322,6 @@ class DeactivateAccountAPIView(APIView):
 
     def post(self, request):
         user = request.user
-
         user.is_active = False
         user.save()
 
@@ -336,7 +351,7 @@ class ProfessionalProgramDetailsAPIView(APIView):
         response={
             "message":message,
             "data":{
-                "program_obj":serializer
+                "program":serializer
             }
         }
         return Response(response)
@@ -344,6 +359,7 @@ class ProfessionalProgramDetailsAPIView(APIView):
 class ProfessionalSubmissionAPIView(APIView):
     renderer_classes=[UserRender]
     permission_classes=[IsAuthenticated]
+
     def get(self,request):
         all_submission=submission.objects.filter(user=request.user.id)
 
@@ -434,14 +450,16 @@ class ProfessionalSubmissionDetailsAPIView(APIView):
     permission_classes=[IsAuthenticated]
     def get(self,request,pk):
         try:
-            data=submission.objects.get(program=pk,user=request.user.id)
+            data=submission.objects.get(id=pk,user=request.user.id)
+
             response={
             "message":"Success",
             "data":{
                 "submission_details_obj":CompanySubmissionSerializer(data).data
             }
             }
-        except:
+        except Exception as e:
+            print(f"Error: {e}")
             response={
             "message":"Failed",
             "data":None
@@ -504,23 +522,18 @@ class FollowProfessionalAPIView(APIView):
     def post(self, request):
         user = request.user
         follower_id = request.data.get('follower_id')
-        # print(f"DEBUG: Received follower_id: {follower_id}")
-        # print(follower_id)
+
         try:
            user_to_follow = User.objects.get(id=follower_id)
            professional_to_follow = professional.objects.get(professional_user=user_to_follow)
-        #    print(user_to_follow)
-        #    print(professional_to_follow)
+
         except professional.DoesNotExist:
             return Response({"message": "Professional not found"}, status=400)
 
-        # try:
 
-        #     print(user_professional)
-        #     print(user_professional.id)
-        # except professional.DoesNotExist:
-        #     return Response({"message": "User does not have a professional profile"}, status=400)
-        user_professional = user.professional_user.get()
+
+        user_professional = professional.objects.get(professional_user=user)
+
         if user_professional.id == professional_to_follow.id:
             return Response({"message": "You cannot follow yourself"}, status=200)
 
@@ -579,42 +592,23 @@ class FollowedUserProfileAPIView(APIView):
         except professional.DoesNotExist:
             return Response({"message": "Followed user not found"}, status=404)
 
-# class FollowersListAPIView(APIView):
-#     permission_classes = [IsAuthenticated]
-
-#     def get(self, request):
-#         user = request.user
-#         try:
-#             professional_user = user.professional_user.get()
-#         except professional.DoesNotExist:
-#             return Response({"followers": []})
-
-#         # print(Follower.objects.get())
-#         followers = Follower.objects.filter(professional=professional_user).select_related('professional')
-#         serializer = FollowerSerializer(followers, many=True)
-#         return Response({"followers": serializer.data})
-
 class FollowersListAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        user = request.user
+        user = request.user.id
         try:
-            professional_instance = user.professional_user.get()
+            profe_user = professional.objects.get(
+                professional_user=request.user.id)
         except professional.DoesNotExist:
             return Response({"followers": []})
-
         # Reverse the relationship to get followers
-        followers = Follower.objects.filter(professional=professional_instance)
-        serializer = UserProfileSerializer(followers, many=True)
+        followers = Follower.objects.filter(professional=profe_user)
+        users_following = [follower.user for follower in followers]
+        serializer = AllUserSerializer(users_following, many=True)
 
-        # Modify the response to include only username and id
-        followers_data = [
-            {"user_id": follower_data["professional_user"]["id"], "username": follower_data["professional_user"]["optional_email"]}
-            for follower_data in serializer.data
-        ]
+        return Response({"following": serializer.data})
 
-        return Response({"followers": followers_data})
 
 class FollowingListAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -704,51 +698,88 @@ class ProfessionalLeaderDetailsAPIView(APIView):
         }
         return Response(response)
 
+
 class ProfessionalSettingsAPIView(APIView):
-    renderer_classes=[UserRender]
-    permission_classes=[IsAuthenticated]
-    def get(self,request):
+    renderer_classes = [UserRender]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
         try:
-            program_count=submission.objects.filter(program__company=request.user.id).count()
-            profesional_obj=professional.objects.get(professional_user=request.user.id)
-            total_payment=payments.objects.filter(transfer_from = profesional_obj.id).aggregate(Sum('amount'))
-            professional_login_details_obj=professional_login_details.objects.get(professional=profesional_obj)
-            try:
-                ExtendUser_obj=ExtendUser.objects.get(user=request.user.id)
+            program_count = submission.objects.filter(program__company=request.user.id).count()
+            professional_obj = professional.objects.get(professional_user=request.user.id)
+            total_payment = payments.objects.filter(transfer_from=professional_obj.id).aggregate(Sum('amount'))
+            professional_login_details_obj = professional_login_details.objects.get(professional=professional_obj)
 
-            except:
-                ExtendUser.objects.create(user=request.user)
-                ExtendUser_obj=ExtendUser.objects.get(user=request.user.id)
+            # try:
+            #     ExtendUser_obj = ExtendUser.objects.get(user=request.user.id)
+            # except ExtendUser.DoesNotExist:
+            #     ExtendUser.objects.create(user=request.user.id)
+            #     ExtendUser_obj = ExtendUser.objects.get(user=request.user.id)
 
-            try:
-                ValidateNumber_obj=ValidateNumber.objects.get(user=ExtendUser_obj.id)
-                if ValidateNumber_obj.status == True:
-                    ValidateNumber_status="True"
-                else:
-                    ValidateNumber_status="False"
-            except:
-                ValidateNumber_obj=None
-                ValidateNumber_status="False"
+            # try:
+            #     ValidateNumber_obj = ValidateNumber.objects.get(user=ExtendUser_obj.id)
+            #     validate_number_status = "True" if ValidateNumber_obj.status else "False"
+            # except ValidateNumber.DoesNotExist:
+            #     ValidateNumber_obj = None
+            #     validate_number_status = "False"
 
-            response={
-                "message":"success",
-                "data":{
-                "details":ProfessionalSettingsSerializer( profesional_obj).data,
-                "program_count":program_count,
-                "total_payment":total_payment,
-                "login_details":ProfessionalLoginDetailsSerializer(professional_login_details_obj).data,
-                "ExtendUser":ProfessionalExtendedUserSerializer(ExtendUser_obj).data,
-                "ValidateNumber":ValidateNumber_obj,}
+            user_submissions = submission.objects.filter(user=request.user.id)
 
+            # certificates_data = self.get_certificates_data(request)
+            profe_user = professional.objects.get(
+                professional_user=request.user.id)
+            certificates_data = Certificate.objects.filter(user=profe_user.id)
+            skills_data = professional_skills.objects.filter(
+                user=profe_user.id)
 
+            streak = calculateStreakforUser(profe_user)
+            streak_badges = []
+            submission_badges=[]
+            for badge in BADGES["streakBadges"]:
+                print(badge)
+                if streak >= badge['threshold']:
+                    streak_badges.append(
+                        {'name': badge['name'], 'image': badge['image']})
+
+            for badge in BADGES['submissionsBadges']:
+                if user_submissions.count() >= badge['threshold']:
+                    submission_badges.append(
+                        {'name': badge['name'], 'image': badge['image']})
+
+            print(submission_badges,streak_badges)
+
+            response = {
+                "message": "success",
+                "data": {
+                    "details": ProfessionalSettingsSerializer(professional_obj).data,
+                    "program_count": program_count,
+                    "total_payment": total_payment,
+                    "login_details": ProfessionalLoginDetailsSerializer(professional_login_details_obj).data,
+                    # "ExtendUser": ProfessionalExtendedUserSerializer(ExtendUser_obj).data,
+                    # "ValidateNumber": {"obj": ValidateNumber_obj, "status": validate_number_status},
+                    "submission_details": CompanySubmissionSerializer(user_submissions, many=True).data,
+                    "skills_data": ProfessionalSkillsSerializer(skills_data,many=True).data,
+                    "certificates_data": ProfessionalCertificatesSerializer(certificates_data,many=True).data,
+                    "streak":streak,
+                    "badges":{'submission_badges':submission_badges,'streak_badges':streak_badges}
                 }
+            }
         except Exception as e:
-            response={
-                "message":"failed",
-                "data":None
+            response = {
+                "message": "failed",
+                "data": None
             }
             print(e)
+
         return Response(response)
+
+    def get_certificates_data(self, request):
+        # Use reverse to generate the URL for ListCertificatesAPIView
+        certificates_url = reverse('list_certificates')
+        client = APIClient()
+        certificates_response = client.get(certificates_url)
+        return certificates_response.data if certificates_response.status_code == status.HTTP_200_OK else None
+
 
 class ProfessionalSettingsNameDescriptionAPIView(APIView):
     renderer_classes=[UserRender]
@@ -899,7 +930,7 @@ class ProfessionalSettingsUpdatePasswordAPIView(APIView):
 
 class ProfessionalSettingsSkillsAPIView(APIView):
     renderer_classes=[UserRender]
-    permission_classes=[IsAuthenticated]
+    # permission_classes=[IsAuthenticated]
     def get(self,request,format=None):
         try:
             profe_user=professional.objects.get(professional_user=request.user.id)
@@ -1341,6 +1372,12 @@ class UserProfileDetailsAPIView(APIView):
     def get(self, request, user_id):
         try:
             user_submissions = submission.objects.filter(user=user_id)
+            profe_user = professional.objects.get(
+                professional_user=user_id)
+            certificates_data = Certificate.objects.filter(user=profe_user.id)
+            skills_data = professional_skills.objects.filter(
+                user=profe_user.id)
+
             user_professional = professional.objects.get(professional_user=user_id)
             user_program_count = submission.objects.filter(program__company=user_id).count()
 
@@ -1361,16 +1398,34 @@ class UserProfileDetailsAPIView(APIView):
                 user_validate_number = None
                 validate_number_status = "False"
 
+            streak = calculateStreakforUser(profe_user)
+            streak_badges = []
+            submission_badges=[]
+            for badge in BADGES[" streakBadges"]:
+                if streak >= badge['threshold']:
+                    streak_badges.append(
+                        {'name': badge['name'], 'image': badge['image']})
+
+            for badge in BADGES['submissionsBadges'].items():
+                if user_submissions.count() >= badge['threshold']:
+                    submission_badges.append(
+                        {'name': badge['name'], 'image': badge['image']})
+
             response = {
                 "message": "success",
                 "data": {
                     "submissions": CompanySubmissionSerializer(user_submissions, many=True).data,
+                    "skills": ProfessionalSkillsSerializer(skills_data,many=True).data,
                     "professional_details": ProfessionalSettingsSerializer(user_professional).data,
                     "program_count": user_program_count,
                     "total_payment": total_payment,
                     "login_details": ProfessionalLoginDetailsSerializer(user_professional_login_details).data,
                     "extend_user": ProfessionalExtendedUserSerializer(user_extend_user).data,
                     "validate_number": user_validate_number,
+                    "streak":streak,
+                    "badges":{"streak_badges":streak_badges,"submission_badges":submission_badges},
+                    "certificates_data": ProfessionalCertificatesSerializer(certificates_data, many=True).data,
+
                 }
             }
 
@@ -1471,20 +1526,46 @@ class WalletBalanceView(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
         else:
             return Response({"error": "Professional wallet not found"}, status=status.HTTP_404_NOT_FOUND)
+# class YourView(APIView):
+#     def post(self, request, *args, **kwargs):
+#         data = request.data  # Assuming the data is provided in the specified format
+#         serializer = UserSelectionSerializer(data=data)
+#         if serializer.is_valid():
+#             request.user.questions_completed = True
+#             request.user.save()
+#             serializer.save()
+#             return Response(serializer.data, status=status.HTTP_201_CREATED)
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+#     def get(self, request):
+#         user_selections = UserSelection.objects.all()
+#         serializer = UserSelectionSerializer(user_selections, many=True)
+#         return Response(serializer.data)
+
+
 class YourView(APIView):
-    def post(self, request, *args, **kwargs):
-        data = request.data  # Assuming the data is provided in the specified format
-        serializer = UserSelectionSerializer(data=data)
+
+    def post(self, request, *args, **kwargs):# Create a mutable copy of the QueryDict
+        serializer = UserSelectionSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            profe_user = professional.objects.get(
+                professional_user=request.user.id)
+            serializer.save(user=profe_user)
+
+            profe_user.questions_completed = True
+            profe_user.save()
+
             return Response(serializer.data, status=status.HTTP_201_CREATED)
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
     def get(self, request):
-        user_selections = UserSelection.objects.all()
-        serializer = UserSelectionSerializer(user_selections, many=True)
+        professional_instance, created = professional.objects.get_or_create(
+            professional_user=request.user.id)
+
+        user_selections = UserSelection.objects.filter(
+            user=professional_instance).get()
+        serializer = UserSelectionSerializer(user_selections)
         return Response(serializer.data)
-
-
 class UserSelectionUpdateView(APIView):
     def put(self, request, pk, *args, **kwargs):
         try:
@@ -1525,3 +1606,26 @@ class CustomScopeEntryListCreateView(APIView):
         serializer = self.serializer_class(scope_entries, many=True)
         return Response(serializer.data)
 
+
+class CompanyProgramDetailsAPIViewinProfessional(APIView):
+    renderer_classes = [UserRender]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        user = request.user
+
+        try:
+            program_obj = companyProgram.objects.get(company=user, id=pk)
+            program_serializer = CompanyProgramSerializer(program_obj)
+            data = {
+                "program": program_serializer.data
+            }
+            response = {
+                "data": data
+            }
+        except companyProgram.DoesNotExist:
+            response = {
+                "message": "Program does not exist"
+            }
+
+        return Response(response)

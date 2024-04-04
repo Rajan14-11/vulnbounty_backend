@@ -1,0 +1,82 @@
+
+
+
+
+<html>
+
+<head>
+
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>
+Error Page 
+</title>
+<!-- <style type="text/css">
+ @import url(style/default/WebGUIStandards.css);
+</style>
+<style type="text/css">
+ @import url(style/default/TableBorders.css);
+</style> -->
+
+
+</head>
+
+<body >
+
+
+<script language="JavaScript">
+function fn_Initiate()
+{
+        /*document.forms[0].action = "web?requestType=PortalRH&actionVal=logout";
+        document.forms[0].target ="_parent";
+        document.forms[0].method = "post";
+        document.forms[0].submit();*/
+        
+        //window.parent.navigate("./index.jsp");
+        window.parent.location.replace("./index.jsp");
+        if(window.parent.fireUnloadEvent)
+        {
+    		window.parent.fireUnloadEvent=false;
+        }
+
+}
+</script>
+
+
+
+<!-- Content -->
+		<div class="container-fluid">
+		<div class="card margin-bottom">
+			<div class="card-body">
+			<div class="content relative login-width" style="padding-top:0px!important;">
+				<div class="login-fields" align="center">
+					<h1><i class="fa fa-exclamation-triangle text-red" style="font-size: 110px;"></i></h1>
+					<div class="login-masthead">
+						<h2>Sorry! An error has occured</h2>
+					</div><br><br>
+
+					<div><strong>We are unable to process your request due to some error</strong></div><br><br>
+					
+					<div><strong>Please try again later</strong></div><br><br>
+					
+					<div>
+						<strong>Click 
+						
+								<a href="https://sparsh.defencepension.gov.in/">here </a>
+									
+						
+						to go to home page
+						</strong>
+					</div>
+					
+				</div> <!-- /login-fields -->
+			</div> <!-- /content -->
+			</div>
+			</div>
+		</div> <!-- /container -->
+
+
+
+</body>
+</html>
+
+
