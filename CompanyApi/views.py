@@ -41,6 +41,9 @@ from .decorators import allowed_users
 from ProfessionalApi.models import private_invitation
 from django.shortcuts import redirect, render
 from rest_framework import generics, status
+from collections import defaultdict
+from datetime import datetime, timedelta
+from django.db.models import Count
 from django.utils import timezone
 import stripe
 # from django.views.decorators.csrf import csrf_exempt
@@ -328,6 +331,25 @@ class CompanySubmissionAPIView(APIView):
     def get(self, request):
         all_submission = submission.objects.filter(
             program_id__company=request.user)
+        user_field_mapping = {}
+
+        for sub in all_submission:
+            user_id = sub.user.id
+            profe_user = professional.objects.get(
+                professional_user=sub.user.id)
+    # Add the user ID and the additional field value to the dictionary
+    # Here, 'your_field_value' is the value you want to assign to each user
+            user_field_mapping[user_id] = profe_user.profile_picture
+
+# Now you can access the additional field value for each user
+        for sub in all_submission:
+            user_id = sub.user.id
+            additional_field_value = user_field_mapping.get(user_id)
+
+        for sub in all_submission:
+            profe_user = professional.objects.get(
+                professional_user=sub.user.id)
+            print(profe_user.profile_picture)
         # pending_submission=submission.objects.filter(program_id__company=request.user,status='pending')
         # accepted_submission=submission.objects.filter(program_id__company=request.user,status='accepted')
         # rejected_submission=submission.objects.filter(program_id__company=request.user,status='rejected')
@@ -419,21 +441,120 @@ class CompanySubmissionAcceptAPIView(APIView):
         return Response(response)
 
 
+def calculateStreakforUser(user):
+    streak = 0
+    today = datetime.now()
+    start_of_year = today.replace(
+        month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    end_of_year = today.replace(
+        month=12, day=31, hour=23, minute=59, second=59, microsecond=999999)
+    submissions = submission.objects.filter(
+        user=user.professional_user, created_at__gte=start_of_year, created_at__lte=end_of_year).order_by('created_at')
+
+    # Calculate streak
+    streaks = defaultdict(int)
+    current_month = None
+    current_streak = 0
+
+    for sub in submissions.order_by('created_at'):
+        submission_month = sub.created_at.month
+
+        if current_month != submission_month:
+            current_month = submission_month
+            current_streak = 0
+
+        current_streak += 1
+        streaks[submission_month] = max(
+            streaks[submission_month], current_streak)
+
+    return streaks
+
+
+def calculate_streak_points(streak):
+    if streak >= 3:
+        return 5
+    elif streak >= 6:
+        return 10
+    elif streak >= 9:
+        return 15
+    elif streak >= 12:
+        return 50
+    else:
+        return 0
+
+
+def calculate_points():
+    submissions = submission.objects.filter(status='accepted').values(
+        'user').annotate(total_points=Count('id'))
+    streak_points = {}
+
+    points = {}
+    for sub in submissions:
+        user_id = sub['user']
+        profe_user = professional.objects.get(
+            professional_user=user_id)
+        streaks = calculateStreakforUser(profe_user)
+        streak = 0
+        for month, value in streaks.items():
+
+            if value == 0:
+                streak = 0
+            else:
+                streak += 1
+
+        streak_points[user_id] = streak
+        streak = streak_points.get(user_id, 0)
+        points[user_id] = sub['total_points'] * \
+            10 + calculate_streak_points(streak)
+    return points
+
+
 class CompanyLeaderBoardAPIView(APIView):
     renderer_classes = [UserRender]
     permission_classes = [IsAuthenticated]
 
+    # def get(self, request):
+    #     data = professional.objects.filter(reward__gte=1).order_by('-reward')
+    #     data1 = Student.objects.filter(reward__gte=1).order_by('-reward')
+
+    #     response = {
+    #         "data": {
+    #             "professional_obj": CompanyProfessionalLeaderBoardSerializer(data, many=True).data,
+    #             "student_obj": CompanyStudentLeaderBoardSerializer(data1, many=True).data
+    #         }
+
+    #     }
+
     def get(self, request):
-        data = professional.objects.filter(reward__gte=1).order_by('-reward')
-        data1 = Student.objects.filter(reward__gte=1).order_by('-reward')
+        try:
+
+            total_points = calculate_points()
+            sorted_rankings = sorted(
+                total_points.items(), key=lambda x: x[1], reverse=True)
+            message = "Success"
+        except:
+            serializer = None
+            message = "Failed"
+
+        leaderboard_data = []
+        for user_id, total_points in sorted_rankings:
+            try:
+                professional_data = professional.objects.get(
+                    professional_user=user_id)
+                serializer = CompanyProfessionalLeaderBoardSerializer(professional_data)
+                leaderboard_data.append({
+                    'user_id': user_id,
+                    'total_points': total_points,
+                    'professional': serializer.data
+                })
+            except professional.DoesNotExist:
+                pass
 
         response = {
-            "data": {
-                "professional_obj": CompanyProfessionalLeaderBoardSerializer(data, many=True).data,
-                "student_obj": CompanyStudentLeaderBoardSerializer(data1, many=True).data
-            }
-
+            "message": message,
+            'data': leaderboard_data
         }
+
         return Response(response)
 
 
@@ -512,7 +633,7 @@ class CompanySettingsAPIView(APIView):
                 "message": "failed",
                 "data": None
             }
-            print(e)
+            print(e,'settings')
         return Response(response)
 
 

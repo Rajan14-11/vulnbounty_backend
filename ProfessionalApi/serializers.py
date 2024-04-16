@@ -91,7 +91,13 @@ class PrivateInvitationSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = "__all__"
+
 class ProfessionalDashboardSerializer(serializers.ModelSerializer):
+    professional_user:UserSerializer()
 
     class Meta:
         model = professional
@@ -104,14 +110,10 @@ class ProfessionalSerializer(serializers.ModelSerializer):
         fields = ('id', 'invitation_preference')
 
 
-class UserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = "__all__"
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    # professional_user = UserSerializer(read_only=True)
+    professional_user = UserSerializer(read_only=True)
     # user_id = serializers.SerializerMethodField()
 
     class Meta:
@@ -133,6 +135,8 @@ class ProfessionalSubmissionSerialiser(serializers.ModelSerializer):
 
 class ProfessionalDashbordserializer(serializers.ModelSerializer):
     professional_user = UserSerializer(read_only=True)
+    # professional = ProfessionalSerializer()
+
     user_id = serializers.SerializerMethodField()
 
     class Meta:
@@ -372,3 +376,6 @@ class AllUserSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class LeaderboardSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField()
+    total_points = serializers.IntegerField()

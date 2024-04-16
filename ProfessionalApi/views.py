@@ -33,6 +33,7 @@ from decimal import Decimal
 from django.urls import reverse
 from rest_framework.test import APIClient
 from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import Count
 from collections import defaultdict
 import stripe
 stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -70,12 +71,7 @@ def calculateStreakforUser(user):
         current_streak += 1
         streaks[submission_month] = max(streaks[submission_month], current_streak)
 
-
-     for month,value in streaks.items():
-
-        if value >=1:
-            streak+=1
-     return streak
+     return streaks
 
 
 BADGES = {
@@ -88,7 +84,7 @@ BADGES = {
             'image': 'https://png.pngtree.com/element_pic/00/16/07/18578cd65e6ecaa.jpg'},
     ],
     'submissionsBadges': [
-        {'name': '5-day Streak Badge', 'image': 'https://png.pngtree.com/element_pic/00/16/07/18578cd65e6ecaa.jpg','threshold':2},
+        {'name': '5-day Streak Badge', 'image': 'https://png.pngtree.com/element_pic/00/16/07/18578cd65e6ecaa.jpg','threshold':1},
         {'name': '10-day Streak Badge', 'image': 'https://png.pngtree.com/element_pic/00/16/07/18578cd65e6ecaa.jpg','threshold':3},
        {'name': '15-day Streak Badge', 'image': 'https://png.pngtree.com/element_pic/00/16/07/18578cd65e6ecaa.jpg','threshold':4},
         {'name': '20-day Streak Badge', 'image': 'https://png.pngtree.com/element_pic/00/16/07/18578cd65e6ecaa.jpg','threshold':5},
@@ -363,7 +359,6 @@ class ProfessionalSubmissionAPIView(APIView):
     def get(self,request):
         all_submission=submission.objects.filter(user=request.user.id)
 
-
         response={
             "message":"success",
             "data":{
@@ -466,26 +461,80 @@ class ProfessionalSubmissionDetailsAPIView(APIView):
         }
         return Response(response)
 
-class ProfessionalLearderAPIView(APIView):
-    renderer_classes=[UserRender]
-    permission_classes=[IsAuthenticated]
-    def get(self,request):
-        try:
-            data = professional.objects.filter(reward__gte=1).order_by('-reward')
-            serialzer=ProfessionalDashbordserializer(data,many=True).data
-            message="Success"
-        except :
-            serialzer=None
-            message="Failed"
 
-        response={
-            "message":message,
-            "data":{
-                "professional_obj":serialzer
-            }
+def calculate_streak_points(streak):
+    if streak >= 3:
+        return 5
+    elif streak >= 6:
+        return 10
+    elif streak >= 9:
+        return 15
+    elif streak >= 12:
+        return 50
+    else:
+        return 0
+
+def calculate_points():
+    submissions = submission.objects.filter(status='accepted').values(
+        'user').annotate(total_points=Count('id'))
+    streak_points = {}
+
+    points = {}
+    for sub in submissions:
+        user_id = sub['user']
+        profe_user = professional.objects.get(
+            professional_user=user_id)
+        streaks = calculateStreakforUser(profe_user)
+        streak = 0
+        for month, value in streaks.items():
+
+            if value == 0:
+                streak = 0
+            else:
+                streak += 1
+
+        streak_points[user_id] = streak
+        streak = streak_points.get(user_id, 0)
+        points[user_id] = sub['total_points']*10 + calculate_streak_points(streak)
+    return points
+
+class ProfessionalLearderAPIView(APIView):
+    renderer_classes = [UserRender]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+
+            total_points = calculate_points()
+            sorted_rankings = sorted(
+                total_points.items(), key=lambda x: x[1], reverse=True)
+            message = "Success"
+        except:
+            serializer = None
+            message = "Failed"
+
+        leaderboard_data = []
+        for user_id, total_points in sorted_rankings:
+            try:
+                professional_data = professional.objects.get(
+                    professional_user=user_id)
+                serializer = ProfessionalDashbordserializer(professional_data)
+                leaderboard_data.append({
+                    'user_id': user_id,
+                    'total_points': total_points,
+                    'professional': serializer.data
+                })
+            except professional.DoesNotExist:
+                pass
+
+        response = {
+            "message": message,
+            'data': leaderboard_data
         }
 
         return Response(response)
+
+
 
 
 class UpdateInvitationPreferenceAPIView(APIView):
@@ -732,11 +781,17 @@ class ProfessionalSettingsAPIView(APIView):
             skills_data = professional_skills.objects.filter(
                 user=profe_user.id)
 
-            streak = calculateStreakforUser(profe_user)
+            streaks = calculateStreakforUser(profe_user)
+            streak=0
+            for month, value in streaks.items():
+
+                if value == 0:
+                    streak = 0
+                else:
+                    streak += 1
             streak_badges = []
             submission_badges=[]
             for badge in BADGES["streakBadges"]:
-                print(badge)
                 if streak >= badge['threshold']:
                     streak_badges.append(
                         {'name': badge['name'], 'image': badge['image']})
@@ -745,8 +800,6 @@ class ProfessionalSettingsAPIView(APIView):
                 if user_submissions.count() >= badge['threshold']:
                     submission_badges.append(
                         {'name': badge['name'], 'image': badge['image']})
-
-            print(submission_badges,streak_badges)
 
             response = {
                 "message": "success",
@@ -760,7 +813,7 @@ class ProfessionalSettingsAPIView(APIView):
                     "submission_details": CompanySubmissionSerializer(user_submissions, many=True).data,
                     "skills_data": ProfessionalSkillsSerializer(skills_data,many=True).data,
                     "certificates_data": ProfessionalCertificatesSerializer(certificates_data,many=True).data,
-                    "streak":streak,
+                    "streak":streaks,
                     "badges":{'submission_badges':submission_badges,'streak_badges':streak_badges}
                 }
             }
@@ -1398,15 +1451,23 @@ class UserProfileDetailsAPIView(APIView):
                 user_validate_number = None
                 validate_number_status = "False"
 
-            streak = calculateStreakforUser(profe_user)
+            streaks = calculateStreakforUser(profe_user)
+            streak=0
+            for month, value in streaks.items():
+
+                if value == 0:
+                    streak = 0
+                else:
+                    streak += 1
+
             streak_badges = []
             submission_badges=[]
-            for badge in BADGES[" streakBadges"]:
+            for badge in BADGES["streakBadges"]:
                 if streak >= badge['threshold']:
                     streak_badges.append(
                         {'name': badge['name'], 'image': badge['image']})
 
-            for badge in BADGES['submissionsBadges'].items():
+            for badge in BADGES['submissionsBadges']:
                 if user_submissions.count() >= badge['threshold']:
                     submission_badges.append(
                         {'name': badge['name'], 'image': badge['image']})
@@ -1422,7 +1483,7 @@ class UserProfileDetailsAPIView(APIView):
                     "login_details": ProfessionalLoginDetailsSerializer(user_professional_login_details).data,
                     "extend_user": ProfessionalExtendedUserSerializer(user_extend_user).data,
                     "validate_number": user_validate_number,
-                    "streak":streak,
+                    "streak":streaks,
                     "badges":{"streak_badges":streak_badges,"submission_badges":submission_badges},
                     "certificates_data": ProfessionalCertificatesSerializer(certificates_data, many=True).data,
 

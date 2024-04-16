@@ -89,6 +89,27 @@ class UserSerializer(serializers.ModelSerializer):
         model=User
         fields=["username","first_name","last_name","email"]
 
+
+class SubmissionUserSerializer(serializers.ModelSerializer):
+
+    profile_picture = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ['profile_picture', 'first_name',
+                  'username', 'email', 'last_name']
+
+    def get_profile_picture(self, obj):
+        # Retrieve additional info for the user
+        # For example, assume the user has a profile_picture field
+        profe_user = professional.objects.get(
+            professional_user=obj.id)
+        profile_picture_url = getattr(profe_user, 'profile_picture', None)
+
+        if profile_picture_url:
+            return profile_picture_url.url  # Assuming profile_picture is an ImageField
+        return None
+
 class ProgramSerializer(serializers.ModelSerializer):
     class Meta:
         model=companyProgram
@@ -101,32 +122,54 @@ class ProgramSerializer(serializers.ModelSerializer):
 #         fields="__all__"
 
 
+# class CompanyProgramSerializer(serializers.ModelSerializer):
+#     company_name = serializers.SerializerMethodField()
+#     company_profile_picture = serializers.SerializerMethodField()
+#     profile_image = serializers.ImageField(
+#         required=False)  # Include the profile image field
+
+#     class Meta:
+#         model = companyProgram
+#         fields = ['company_name', 'company_profile_picture', 'profile_image', 'slug', 'title', 'introduction', 'vulnerability_concerns', 'region', 'visibility',
+#                   'target', 'scope_type', 'out_target', 'p1_min', 'p1_max', 'p2_min', 'p2_max', 'p3_min', 'p3_max',
+#                   'p4_min', 'p4_max', 'p5_min', 'p5_max', 'max_reward', 'severity', 'expiry_date', 'posted',
+#                   'policy', 'created_at', 'edited_at']
+
+#     def get_company_name(self, obj):
+#         return obj.company.username
+
+#     def get_company_profile_picture(self, obj):
+#         return CompanySerializer(obj.company).data.get('profile_picture')
+
 class CompanyProgramSerializer(serializers.ModelSerializer):
     company_name = serializers.SerializerMethodField()
-    company_profile_picture = serializers.SerializerMethodField()
-    profile_image = serializers.ImageField(
-        required=False)  # Include the profile image field
+
+    profile_picture = serializers.SerializerMethodField()
 
     class Meta:
         model = companyProgram
-        fields = ['company_name', 'company_profile_picture', 'profile_image', 'slug', 'title', 'introduction', 'vulnerability_concerns', 'region', 'visibility',
-                  'target', 'scope_type', 'out_target', 'p1_min', 'p1_max', 'p2_min', 'p2_max', 'p3_min', 'p3_max',
-                  'p4_min', 'p4_max', 'p5_min', 'p5_max', 'max_reward', 'severity', 'expiry_date', 'posted',
-                  'policy', 'created_at', 'edited_at']
+        exclude = ['company']
 
     def get_company_name(self, obj):
         return obj.company.username
 
-    def get_company_profile_picture(self, obj):
-        return CompanySerializer(obj.company).data.get('profile_picture')
+    def get_profile_picture(self, obj):
+
+        comp_user = company.objects.get(
+            company_user=obj.company.id)
+        profile_picture_url = getattr(comp_user, 'profile_picture', None)
+        if profile_picture_url:
+            return profile_picture_url.url  # Assuming profile_picture is an ImageField
+        return None
+
 
 class CompanySubmissionSerializer(serializers.ModelSerializer):
-    user=UserSerializer(read_only=True)
-    program=CompanyProgramSerializer(read_only=True)
-    class Meta:
-        model=submission
-        fields="__all__"
+    user = SubmissionUserSerializer(read_only=True)
+    program = CompanyProgramSerializer(read_only=True)
 
+    class Meta:
+        model = submission
+        fields = "__all__"
 
 
 class CompanyProfessionalLeaderBoardSerializer(serializers.ModelSerializer):
@@ -135,7 +178,8 @@ class CompanyProfessionalLeaderBoardSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = professional
-        fields = ['user_id', 'professional_user', 'phone', 'profile_picture', 'profile_description', 'resume', 'reward', 'optional_email', 'interst']
+        fields = ['user_id', 'professional_user', 'phone', 'profile_picture',
+                  'profile_description', 'resume', 'reward', 'optional_email', 'interst']
 
     def get_user_id(self, obj):
         return obj.professional_user.id
@@ -146,40 +190,49 @@ class CompanyStudentLeaderBoardSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Student
-        fields = ('user_id','phone', 'profile_picture', 'profile_description', 'resume', 'reward','interst','reward','student_user')
+        fields = ('user_id', 'phone', 'profile_picture', 'profile_description',
+                  'resume', 'reward', 'interst', 'reward', 'student_user')
 
     def get_user_id(self, obj):
         return obj.student_user.id
 
+
 class ComapnyImageUploadSerializer(serializers.ModelSerializer):
-    profile_picture=serializers.ImageField(required=True)
+    profile_picture = serializers.ImageField(required=True)
+
     class Meta:
-        model=company
-        fields=["profile_picture"]
+        model = company
+        fields = ["profile_picture"]
         extra_kwargs = {
             'profile_picture': {'required': True},
         }
-    def validate(self,data):
-        if not data.get('profile_picture') :
-            raise serializers.ValidationError({"profile_picture":"This field is required."})
+
+    def validate(self, data):
+        if not data.get('profile_picture'):
+            raise serializers.ValidationError(
+                {"profile_picture": "This field is required."})
         else:
             return data
 
+
 class CompanySettingsSerializer(serializers.ModelSerializer):
-    company_user=UserSerializer(read_only=True)
+    company_user = UserSerializer(read_only=True)
+
     class Meta:
-        model=company
-        fields="__all__"
+        model = company
+        fields = "__all__"
+
 
 class CompanyLoginDetailsSerializer(serializers.ModelSerializer):
     class Meta:
-        model=company_login_details
-        fields="__all__"
+        model = company_login_details
+        fields = "__all__"
+
 
 class CompanyExtendedUserSerializer(serializers.ModelSerializer):
     class Meta:
-        model=ExtendUser
-        fields="__all__"
+        model = ExtendUser
+        fields = "__all__"
 
 
 class CompanyCreateProgramSerializer(serializers.ModelSerializer):
@@ -188,57 +241,58 @@ class CompanyCreateProgramSerializer(serializers.ModelSerializer):
         fields = [
             'slug', 'title', 'introduction', 'vulnerability_concerns', 'target', 'out_target',
             'scope_type',  'expiry_date', 'visibility', 'p1_min', 'p1_max', 'p2_min', 'p2_max',
-            'p3_min', 'p3_max', 'p4_min', 'p4_max', 'p5_min', 'p5_max', 'policy', 'severity','region'
+            'p3_min', 'p3_max', 'p4_min', 'p4_max', 'p5_min', 'p5_max', 'policy', 'severity', 'region'
         ]
+
+
 class ScopeEntrySerializer(serializers.ModelSerializer):
     class Meta:
         model = ScopeEntry
-        fields = ['asset_name','asset_description','type','coverage','max_severity','bounty']
+        fields = ['asset_name', 'asset_description',
+                  'type', 'coverage', 'max_severity', 'bounty']
+
+
 class CompanyCreateProgramSaveSerializer(serializers.ModelSerializer):
     class Meta:
-        model=companyProgram
-        fields=['slug','title','introduction','vulnerability_concerns','region','visibility','severity','expiry_date','profile_image']
+        model = companyProgram
+        fields = ['slug', 'title', 'introduction', 'vulnerability_concerns',
+                  'region', 'visibility', 'severity', 'expiry_date', 'profile_image']
+
 
 class CompanyChangeNameSerializer(serializers.Serializer):
-    first_name=serializers.CharField()
-    last_name=serializers.CharField()
-    description=serializers.CharField()
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    description = serializers.CharField()
+
 
 class CompanyChangeUserNameSerializer(serializers.Serializer):
-    email=serializers.EmailField(required=True)
-    username=serializers.CharField(required=True)
-    password=serializers.CharField(required=True)
+    email = serializers.EmailField(required=True)
+    username = serializers.CharField(required=True)
+    password = serializers.CharField(required=True)
+
 
 class CompanyUpdatePasswordSerializer(serializers.Serializer):
-    password1=serializers.CharField()
-    password2=serializers.CharField()
-    password3=serializers.CharField()
+    password1 = serializers.CharField()
+    password2 = serializers.CharField()
+    password3 = serializers.CharField()
+
 
 class CompanyWalletHistory(serializers.ModelSerializer):
-    company=CompanySettingsSerializer(read_only=True)
-    recived_from=UserSerializer(read_only=True)
+    company = CompanySettingsSerializer(read_only=True)
+    recived_from = UserSerializer(read_only=True)
+
     class Meta:
-        model=company_wallet_history
-        fields=['company',"amount",'description','recived_from','status','created_at']
+        model = company_wallet_history
+        fields = ['company', "amount", 'description',
+                  'recived_from', 'status', 'created_at']
+
 
 class CompanySerializer(serializers.ModelSerializer):
     class Meta:
         model = company
         fields = ['profile_picture']
 
-class CompanyProgramSerializer(serializers.ModelSerializer):
-    company_name = serializers.SerializerMethodField()
-    
 
-    class Meta:
-        model = companyProgram
-        exclude = ['company']
-
-    def get_company_name(self, obj):
-        return obj.company.username
-
-    def get_company_profile_picture(self, obj):
-        return CompanySerializer(obj.company).data['profile_picture']
 
 
 class ProgramCollectionSerializer(serializers.ModelSerializer):

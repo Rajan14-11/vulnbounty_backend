@@ -6,6 +6,7 @@ from django.utils import timezone
 from django.apps import apps
 from django.conf import settings
 
+
 class company(models.Model):
     company_user=models.OneToOneField(User,on_delete=models.CASCADE,default="")
     company_name=models.CharField(max_length=100, null=True)
@@ -96,6 +97,7 @@ class companyProgram(models.Model):
 
 class submission(models.Model):
     user=models.ForeignKey(User,on_delete=models.CASCADE,null=True)
+    # professional_user=models.ForeignKey(professional,on_delete=models.CASCADE,null=True)
     program=models.ForeignKey(companyProgram,on_delete=models.CASCADE,null=True)
     title = models.CharField(max_length=199)
 
