@@ -86,6 +86,7 @@ class ProfessionalRegisterSdrializer(serializers.ModelSerializer):
 
 
 class PrivateInvitationSerializer(serializers.ModelSerializer):
+    program = CompanyProgramSerializer()
     class Meta:
         model = private_invitation
         fields = '__all__'
@@ -118,7 +119,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = '__all__'
+        fields = ['professional_user']
 
 
 class CertificateSerializer(serializers.ModelSerializer):
@@ -365,7 +366,11 @@ class ProfessionalBankDetailSerializer(serializers.ModelSerializer):
 
 class ProfessionalWalletSerializer(serializers.ModelSerializer):
     class Meta:
-        model = ProfessionalWallet
+        model = professional_wallet
+        fields = '__all__'
+class ProfessionalWalletHistorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = professional_wallet_history
         fields = '__all__'
 
 class AllUserSerializer(serializers.ModelSerializer):

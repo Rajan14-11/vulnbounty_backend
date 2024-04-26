@@ -1193,8 +1193,9 @@ class ProfessionalInformationAPIView(APIView):
 class ProfessionalPaymentAPIView(APIView):
     renderer_classes=[UserRender]
     permission_classes=[IsAuthenticated]
+
     def post(self,request,format=None):
-        print("reached")
+
         professional_data=professional.objects.get(professional_user=request.user.id)
         serializer = ProfessionalPaymentSerializer(data=request.data)
         if serializer.is_valid():
@@ -1308,33 +1309,6 @@ class UpdateUserProfileAndProfessional(APIView):
                 return Response(professional_serializer.errors, status=400)
         else:
             return Response(profile_serializer.errors, status=400)
-
-
-
-# class UserSelectionViewSet(APIView):
-#     renderer_classes=[UserRender]
-#     permission_classes=[IsAuthenticated]
-#     # def post(self, request):
-#     #     print(request.data)
-#     #     serializer = UserResponseofQuestionSerializer(data=request.data)
-#     #     if serializer.is_valid():
-#     #         serializer.save()
-#     #         return Response(serializer.data, status=status.HTTP_201_CREATED)
-#     #     # return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-#     def post(self, request, *args, **kwargs):
-#         data = request.data  # Assuming the data is provided under the 'data' key
-#         print(data)
-#         serializer = UserResponseofQuestionSerializer(data={'data': data})
-#         if serializer.is_valid():
-#             serializer.save()
-#             return Response(serializer.data, status=status.HTTP_201_CREATED)
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-#     def get(self, request):
-#         user_selections = UserSelection.objects.all()
-#         serializer = UserResponseofQuestionSerializer(user_selections, many=True)
-#         return Response(serializer.data)
 
 class UnifiedCompanyAPIView(APIView):
     renderer_classes = [UserRender]
@@ -1580,28 +1554,20 @@ class WalletBalanceView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
-        professional_wallet = ProfessionalWallet.objects.get_wallet(request.user.professional_user)
-
+        prof_wallet = professional_wallet.objects.get(professional = request.user.professional_user)
+        prof_wallet_history = professional_wallet_history.objects.get(professional=request.user.professional_user)
         if professional_wallet:
-            serializer = ProfessionalWalletSerializer(professional_wallet)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            wallet = ProfessionalWalletSerializer(prof_wallet).data
+            walletHistory = ProfessionalWalletHistorySerializer(prof_wallet_history).data
+            response = {
+                "data":{
+                    "wallet":wallet,
+                    "walletHistory":walletHistory
+                }
+            }
+            return Response(response,status=status.HTTP_200_OK)
         else:
             return Response({"error": "Professional wallet not found"}, status=status.HTTP_404_NOT_FOUND)
-# class YourView(APIView):
-#     def post(self, request, *args, **kwargs):
-#         data = request.data  # Assuming the data is provided in the specified format
-#         serializer = UserSelectionSerializer(data=data)
-#         if serializer.is_valid():
-#             request.user.questions_completed = True
-#             request.user.save()
-#             serializer.save()
-#             return Response(serializer.data, status=status.HTTP_201_CREATED)
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-#     def get(self, request):
-#         user_selections = UserSelection.objects.all()
-#         serializer = UserSelectionSerializer(user_selections, many=True)
-#         return Response(serializer.data)
-
 
 class YourView(APIView):
 

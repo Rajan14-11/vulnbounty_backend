@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import companyProgram,DropdownMenuOption,submission,ProgramCollection,company,company_login_details,company_wallet_history,ScopeEntry,CompanyWallet,CompanyBankDetail,Transaction
+from .models import companyProgram,DropdownMenuOption,submission,ProgramCollection,company,company_login_details,company_wallet_history,ScopeEntry,CompanyWallet,CompanyBankDetail,Transaction,company_wallet
 from ProfessionalApi.models import professional
 from StudentApi.models import Student
 from MainApi.models import ExtendUser
@@ -286,6 +286,10 @@ class CompanyWalletHistory(serializers.ModelSerializer):
         fields = ['company', "amount", 'description',
                   'recived_from', 'status', 'created_at']
 
+class companyWallet(serializers.ModelSerializer):
+    class Meta:
+        model = company_wallet
+        fields='__all__'
 
 class CompanySerializer(serializers.ModelSerializer):
     class Meta:
@@ -343,10 +347,10 @@ class DropdownMenuOptionSerializer(serializers.ModelSerializer):
 #         model = CompanyBankDetail
 #         fields = ['account_number','bank_name','account_holder_name','balance']
 
-# class CompanyWalletSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = CompanyWallet
-#         fields = '__all__'
+class CompanyWalletSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CompanyWallet
+        fields = '__all__'
 
 # class PaymentSuccessSerializer(serializers.Serializer):
 #     professional_user = serializers.CharField()

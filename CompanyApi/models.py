@@ -23,6 +23,7 @@ class company(models.Model):
 class company_wallet(models.Model):
     company = models.OneToOneField(company,on_delete=models.CASCADE)
     amount = models.FloatField(default=0)
+    
 class company_wallet_history(models.Model):
     company= models.ForeignKey(company,on_delete=models.CASCADE)
     amount=models.FloatField(default=0,null = False)
@@ -189,8 +190,7 @@ class DropdownMenuOption(models.Model):
 class CompanyWallet(models.Model):
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)
     company = models.ForeignKey(company, on_delete=models.CASCADE, related_name='company_personal_wallet')
-    stripe_account_id = models.CharField(max_length=255,null=True)
-    stripe_transaction_id = models.CharField(max_length=255, null=True, blank=True)
+
 
 class CompanyBankDetail(models.Model):
     company = models.ForeignKey(company, on_delete=models.CASCADE, related_name='company_bank_details')

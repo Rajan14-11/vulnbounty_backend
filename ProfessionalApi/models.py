@@ -45,10 +45,12 @@ class professional(models.Model):
 class professional_skills(models.Model):
     user=models.ForeignKey(professional,on_delete=models.CASCADE)
     skill=models.CharField(max_length=40,)
+
 class private_invitation(models.Model):
     program=models.ForeignKey(companyProgram,on_delete=models.CASCADE)
     hunter=models.ForeignKey(professional, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
+
 class Certificate(models.Model):
     user = models.ForeignKey(professional, on_delete=models.CASCADE, null=True)
 
@@ -69,6 +71,7 @@ class professional_socialmedia(models.Model):
 class professional_wallet(models.Model):
     professional=models.OneToOneField(professional,on_delete=models.CASCADE)
     amount=models.FloatField(default=0)
+
 class professional_wallet_history(models.Model):
     professional= models.ForeignKey(professional,on_delete=models.CASCADE)
     amount=models.FloatField(default=0,null = False)
@@ -79,10 +82,12 @@ class professional_wallet_history(models.Model):
         ]
     status=models.CharField(max_length=3,null = False,choices=choices)
     created_at = models.DateTimeField(auto_now_add=True)
+
 class Follower(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='following')
     professional = models.ForeignKey(professional, on_delete=models.CASCADE, related_name='followers')
     created_at = models.DateTimeField(auto_now_add=True)
+    
 class professional_information(models.Model):
     professional = models.OneToOneField(professional,on_delete=models.CASCADE)
     choices=[
@@ -117,10 +122,6 @@ class professional_login_details(models.Model):
 class professional_favourite_program(models.Model):
     professional = models.ForeignKey(professional,on_delete=models.CASCADE)
     program_id =models.ForeignKey(companyProgram,on_delete=models.CASCADE)
-    # program_id = models.ForeignKey(
-    #     apps.get_model(settings.COMPANY_APP_LABEL, 'companyProgram'),
-    #     on_delete=models.CASCADE,
-    # )
 
 class professional_test(models.Model):
     question=models.TextField()

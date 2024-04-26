@@ -58,7 +58,7 @@ urlpatterns = [
     path('bank-detail/create/', views.ProfessionalBankDetailCreateView.as_view(), name='professional-bank-detail-create'),
     path('bank-detail/retrieve/', views.ProfessionalBankDetailRetrieveView.as_view(), name='professional-bank-detail-retrieve'),
     path('withdraw-money-from-wallet/', views.WithdrawMoneyFromWalletView.as_view(), name='withdraw-money-from-wallet'),
-    path('wallet-balance/', views.WalletBalanceView.as_view(), name='wallet-balance'),
+    path('wallet/', views.WalletBalanceView.as_view(), name='wallet-balance'),
     path('streak/', views.StreakAPIView.as_view(), name='streak-api'),
     path('custom-scope-entries/<int:program_id>/',
          views.CustomScopeEntryListCreateView.as_view(), name='custom-scope-entry-list'),
