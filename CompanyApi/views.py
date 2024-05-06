@@ -17,7 +17,8 @@ from django.http import JsonResponse, HttpResponse
 from rest_framework.permissions import AllowAny
 from django.db.models import Sum
 from StudentApi.models import Student
-from ProfessionalApi.models import professional,professional_wallet,professional_wallet_history
+from ProfessionalApi.models import professional,professional_wallet,professional_wallet_history,Certificate,professional_skills,professional_login_details
+from ProfessionalApi.serializers import UserProfileSerializer,ProfessionalSkillsSerializer,ProfessionalSettingsSerializer,ProfessionalLoginDetailsSerializer,ProfessionalExtendedUserSerializer,ProfessionalCertificatesSerializer,ProfessionalDashbordserializer
 from rest_framework.decorators import api_view, permission_classes
 import re
 from twilio.rest import Client
@@ -45,6 +46,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from django.db.models import Count
 from django.utils import timezone
+from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 import stripe
 # from django.views.decorators.csrf import csrf_exempt
@@ -184,6 +186,68 @@ def stripe_webhook(request):
     return HttpResponse(status=200)
 
 
+BADGES = {
+    'streakBadges': [
+        {'name': 'Streak Beginner', 'threshold': 3,
+            'image': 'https://png.pngtree.com/element_pic/00/16/07/18578cd65e6ecaa.jpg'},
+        {'name': 'Streak Intermediate', 'threshold': 7,
+            'image': 'https://png.pngtree.com/element_pic/00/16/07/18578cd65e6ecaa.jpg'},
+        {'name': 'Streak Expert', 'threshold': 12,
+            'image': 'https://png.pngtree.com/element_pic/00/16/07/18578cd65e6ecaa.jpg'},
+    ],
+    'submissionsBadges': [
+        {'name': '5-day Streak Badge',
+            'image': 'https://png.pngtree.com/element_pic/00/16/07/18578cd65e6ecaa.jpg', 'threshold': 1},
+        {'name': '10-day Streak Badge',
+            'image': 'https://png.pngtree.com/element_pic/00/16/07/18578cd65e6ecaa.jpg', 'threshold': 3},
+        {'name': '15-day Streak Badge',
+            'image': 'https://png.pngtree.com/element_pic/00/16/07/18578cd65e6ecaa.jpg', 'threshold': 4},
+        {'name': '20-day Streak Badge',
+            'image': 'https://png.pngtree.com/element_pic/00/16/07/18578cd65e6ecaa.jpg', 'threshold': 5},
+        {'name': '100-day Streak Badge',
+            'image': 'https://png.pngtree.com/element_pic/00/16/07/18578cd65e6ecaa.jpg', 'threshold': 6},
+    ]
+}
+
+
+def calculate_streak_points(streak):
+    if streak >= 3:
+        return 5
+    elif streak >= 6:
+        return 10
+    elif streak >= 9:
+        return 15
+    elif streak >= 12:
+        return 50
+    else:
+        return 0
+
+
+def calculate_points():
+    submissions = submission.objects.filter(status='completed').values(
+        'user').annotate(total_points=Count('id'))
+    streak_points = {}
+
+    points = {}
+    for sub in submissions:
+        user_id = sub['user']
+        profe_user = professional.objects.get(
+            professional_user=user_id)
+        streaks = calculateStreakforUser(profe_user)
+        streak = 0
+        for month, value in streaks.items():
+
+            if value == 0:
+                streak = 0
+            else:
+                streak += 1
+
+        streak_points[user_id] = streak
+        streak = streak_points.get(user_id, 0)
+        points[user_id] = sub['total_points'] * \
+            10 + calculate_streak_points(streak)
+    return points
+
 class CompanyRegisterAPIView(APIView):
     renderer_classes = [UserRender]
 
@@ -234,13 +298,31 @@ class CompanyDashboardAPIView(APIView):
             transfer_from=company_obj.id, created_at__date=date.today()).aggregate(Sum('amount'))
         payment_this_month = payments.objects.filter(
             transfer_from=company_obj.id, created_at__month=date.today().month).aggregate(Sum('amount'))
+
+        total_points = calculate_points()
+        sorted_rankings = sorted(
+                total_points.items(), key=lambda x: x[1], reverse=True)
+
+
+
+        leaderboard_data = []
+        for user_id, total_points in sorted_rankings:
+            professional_data = professional.objects.get(
+                    professional_user=user_id)
+            serializer = ProfessionalDashbordserializer(professional_data)
+            leaderboard_data.append({
+                    'user_id': user_id,
+                    'total_points': total_points,
+                    'professional': serializer.data
+                })
         message = "success"
         response = {
             "message": message,
             "data": {
                 "submission_today": submission_today,
                 "submission_this_month": submission_this_month,
-                "top_hunter": CompanyProfessionalLeaderBoardSerializer(top_hunter, many=True).data,
+                # "top_hunter": CompanyProfessionalLeaderBoardSerializer(top_hunter, many=True).data,
+                "top_hunter": leaderboard_data,
                 "payment_today": payment_today,
                 "payment_this_month": payment_this_month
             }
@@ -577,43 +659,7 @@ def calculateStreakforUser(user):
     return streaks
 
 
-def calculate_streak_points(streak):
-    if streak >= 3:
-        return 5
-    elif streak >= 6:
-        return 10
-    elif streak >= 9:
-        return 15
-    elif streak >= 12:
-        return 50
-    else:
-        return 0
 
-
-def calculate_points():
-    submissions = submission.objects.filter(status='accepted').values(
-        'user').annotate(total_points=Count('id'))
-    streak_points = {}
-
-    points = {}
-    for sub in submissions:
-        user_id = sub['user']
-        profe_user = professional.objects.get(
-            professional_user=user_id)
-        streaks = calculateStreakforUser(profe_user)
-        streak = 0
-        for month, value in streaks.items():
-
-            if value == 0:
-                streak = 0
-            else:
-                streak += 1
-
-        streak_points[user_id] = streak
-        streak = streak_points.get(user_id, 0)
-        points[user_id] = sub['total_points'] * \
-            10 + calculate_streak_points(streak)
-    return points
 
 
 class CompanyLeaderBoardAPIView(APIView):
@@ -1203,7 +1249,7 @@ class TransferMoneyToProfessionalView(APIView):
         if company_wallet and professional and amount >= 0:
             try:
                if(amount<=wallet.amount):
-                prof_wallet.amount+=amount
+                prof_wallet.amount += (amount - (20*amount)/100)
                 wallet.amount -= amount
                 submission_obj.status = 'completed'
                 submission_obj.save()
@@ -1211,10 +1257,11 @@ class TransferMoneyToProfessionalView(APIView):
                 wallet.save()
                 company_wallet_history.objects.create(company=company_obj,
                                                       amount=amount,
-                                                      description='Money sent to user ' + str(professional_user.professional_user.first_name),
-                                                      #   recived_from= session['metadata']['user'],
+                                                      description='Money sent to user ' +
+                                                      str(professional_user.professional_user.first_name),
                                                       status='db')
-                professional_wallet_history.objects.create(professional=professional_user,amount=amount,description='Reward from '+ str(company_obj.company_user),status='cr')
+                professional_wallet_history.objects.create(professional=professional_user, amount=amount, recived_from=
+                    company_obj.company_user, description='Reward from ' + str(company_obj.company_user), status='cr')
 
             except Exception as e:
                print(e)
@@ -1224,3 +1271,104 @@ class TransferMoneyToProfessionalView(APIView):
             return Response({"error": "Company wallet, professional, or invalid amount"}, status=status.HTTP_400_BAD_REQUEST)
 
 
+class SearchUserByUsername(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, username):
+        user = get_object_or_404(User, username=username)
+        try:
+            # submissions=submission.objects.filter(program__company=request.user.id)
+            # print(submissions)
+            profile_instance = professional.objects.get(professional_user=user)
+        except professional.DoesNotExist:
+            return Response({"message": "User not found in Professional model"}, status=404)
+
+        serializer = UserProfileSerializer(profile_instance)
+        return Response(serializer.data)
+
+
+class UserProfileDetailsAPIView(APIView):
+    renderer_classes = [UserRender]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, user_id):
+        try:
+            user_submissions = submission.objects.filter(user=user_id)
+            profe_user = professional.objects.get(
+                professional_user=user_id)
+            certificates_data = Certificate.objects.filter(user=profe_user.id)
+            skills_data = professional_skills.objects.filter(
+                user=profe_user.id)
+
+            user_professional = professional.objects.get(
+                professional_user=user_id)
+            user_program_count = submission.objects.filter(
+                program__company=user_id).count()
+
+            total_payment = payments.objects.filter(
+                transfer_from=user_professional.id).aggregate(Sum('amount'))
+
+            user_professional_login_details = professional_login_details.objects.get(
+                professional=user_professional)
+
+            try:
+                user_extend_user = ExtendUser.objects.get(user=user_id)
+            except ExtendUser.DoesNotExist:
+                ExtendUser.objects.create(user=user_id)
+                user_extend_user = ExtendUser.objects.get(user=user_id)
+
+            try:
+                user_validate_number = ValidateNumber.objects.get(
+                    user=user_extend_user.id)
+                validate_number_status = "True" if user_validate_number.status else "False"
+            except ValidateNumber.DoesNotExist:
+                user_validate_number = None
+                validate_number_status = "False"
+
+            streaks = calculateStreakforUser(profe_user)
+            streak = 0
+            for month, value in streaks.items():
+
+                if value == 0:
+                    streak = 0
+                else:
+                    streak += 1
+
+            streak_badges = []
+            submission_badges = []
+            for badge in BADGES["streakBadges"]:
+                if streak >= badge['threshold']:
+                    streak_badges.append(
+                        {'name': badge['name'], 'image': badge['image']})
+
+            for badge in BADGES['submissionsBadges']:
+                if user_submissions.count() >= badge['threshold']:
+                    submission_badges.append(
+                        {'name': badge['name'], 'image': badge['image']})
+
+            response = {
+                "message": "success",
+                "data": {
+                    "submissions": CompanySubmissionSerializer(user_submissions, many=True).data,
+                    "skills": ProfessionalSkillsSerializer(skills_data, many=True).data,
+                    "professional_details": ProfessionalSettingsSerializer(user_professional).data,
+                    "program_count": user_program_count,
+                    "total_payment": total_payment,
+                    "login_details": ProfessionalLoginDetailsSerializer(user_professional_login_details).data,
+                    "extend_user": ProfessionalExtendedUserSerializer(user_extend_user).data,
+                    "validate_number": user_validate_number,
+                    "streak": streaks,
+                    "badges": {"streak_badges": streak_badges, "submission_badges": submission_badges},
+                    "certificates_data": ProfessionalCertificatesSerializer(certificates_data, many=True).data,
+
+                }
+            }
+
+        except Exception as e:
+            response = {
+                "message": "failed",
+                "data": None
+            }
+            print(e)
+
+        return Response(response)

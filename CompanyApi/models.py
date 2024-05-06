@@ -23,18 +23,26 @@ class company(models.Model):
 class company_wallet(models.Model):
     company = models.OneToOneField(company,on_delete=models.CASCADE)
     amount = models.FloatField(default=0)
-    
+
+
 class company_wallet_history(models.Model):
-    company= models.ForeignKey(company,on_delete=models.CASCADE)
-    amount=models.FloatField(default=0,null = False)
-    description=models.CharField(max_length=40,null = False,default="description")
-    recived_from=models.ForeignKey(User,on_delete=models.CASCADE,null = True)
-    choices=[
-        ('db','Debited'),
-        ('cr','Credited')
-        ]
-    status=models.CharField(max_length=3,null = False,choices=choices,default='none')
+    company = models.ForeignKey(company, on_delete=models.CASCADE)
+    amount = models.FloatField(default=0, null=False)
+    description = models.CharField(
+        max_length=40, null=False, default="description")
+    # recived_from=models.ForeignKey(User,on_delete=models.CASCADE,null = True)
+    choices = [
+        ('db', 'Debited'),
+        ('cr', 'Credited')
+    ]
+    status = models.CharField(max_length=3, null=False,
+                              choices=choices, default='none')
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class company_razorpay_account(models.Model):
+    company = models.ForeignKey(company, on_delete=models.CASCADE,null=True)
+    acc_id = models.CharField(max_length=30, null=True,unique=True)
 
 class company_login_details(models.Model):
     company=models.OneToOneField(company,on_delete=models.CASCADE)

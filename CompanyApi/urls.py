@@ -42,5 +42,9 @@ urlpatterns = [
     # path('company-wallet-details/', views.CompanyWalletDetailsView.as_view(), name='company-wallet-details'),
     # path('api/payment/', views.PaymentAPIView.as_view(), name='payment_api'),
     # path('api/process_payment/', views.ProcessPaymentAPIView.as_view(), name='process_payment_api'),
+    path('search-user/<str:username>/',
+         views.SearchUserByUsername.as_view(), name='search-user-by-username'),
+    path('user-profile-details/<int:user_id>/',
+         views.UserProfileDetailsAPIView.as_view(), name='user_profile_details_api'),
     path("razorpay/", include("CompanyApi.api.urls"))
 ]

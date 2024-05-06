@@ -369,6 +369,8 @@ class ProfessionalWalletSerializer(serializers.ModelSerializer):
         model = professional_wallet
         fields = '__all__'
 class ProfessionalWalletHistorySerializer(serializers.ModelSerializer):
+    professional = ProfessionalSerializer()
+    recived_from = UserSerializer()
     class Meta:
         model = professional_wallet_history
         fields = '__all__'

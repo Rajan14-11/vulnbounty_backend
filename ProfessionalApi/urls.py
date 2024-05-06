@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from .views import YourView
+from .views import YourView,CreateAccount,FundAccounts
 
 urlpatterns = [
     path('register/',views.ProfessionalRegisterAPIView.as_view()),
@@ -59,13 +59,28 @@ urlpatterns = [
     path('bank-detail/retrieve/', views.ProfessionalBankDetailRetrieveView.as_view(), name='professional-bank-detail-retrieve'),
     path('withdraw-money-from-wallet/', views.WithdrawMoneyFromWalletView.as_view(), name='withdraw-money-from-wallet'),
     path('wallet/', views.WalletBalanceView.as_view(), name='wallet-balance'),
-    path('streak/', views.StreakAPIView.as_view(), name='streak-api'),
+#     path('streak/', views.StreakAPIView.as_view(), name='streak-api'),
+    path('stripeCreateAccountSession/', views.StripeConnectCreateAccountSessionView.as_view(), name='stripeconnect-accountsession'),
+#     path('stripeConnectCreateAccount/', views.StripeConnectCreateAccount.as_view(), name='stripeconnect-createaccount-api'),
     path('custom-scope-entries/<int:program_id>/',
          views.CustomScopeEntryListCreateView.as_view(), name='custom-scope-entry-list'),
     path('program/<int:pk>/', views.CompanyProgramDetailsAPIViewinProfessional.as_view(),
          name='company-program-details -in_professional'),
+#     path('stripeaccountget/<str:pk>/', views.StripeConnectAccountRetrieve.as_view(),
+#          name='stripeaccountget'),
+    path('stripeaccountupdate/<str:pk>/', views.StripeAccUpdate.as_view(),
+         name='stripeaccountupdate'),
 #     path('api/calculate_streak/<int:user_id>/',
 #          views.CalculateStreakAPIView.as_view(), name='calculate_streak'),
 #     path('api/award-streak-badges/<int:user_id>/',
 #          views.AwardStreakBadgesAPIView.as_view(), name='award_streak_badges_api')
+    path("razorpay/account/create",
+         CreateAccount.as_view(),
+         name="razorpay-create-account-api"
+         ),
+
+    path("razorpay/accounts/",
+         FundAccounts.as_view(),
+         name="razorpay-fund-account-api"
+         ),
 ]

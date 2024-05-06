@@ -76,6 +76,7 @@ class professional_wallet_history(models.Model):
     professional= models.ForeignKey(professional,on_delete=models.CASCADE)
     amount=models.FloatField(default=0,null = False)
     description=models.CharField(max_length=40,null = False)
+    recived_from=models.ForeignKey(User,on_delete=models.CASCADE,null = True)
     choices=[
         ('db','Debited'),
         ('cr','Credited')
@@ -83,11 +84,16 @@ class professional_wallet_history(models.Model):
     status=models.CharField(max_length=3,null = False,choices=choices)
     created_at = models.DateTimeField(auto_now_add=True)
 
+
+class professional_razorpay_account(models.Model):
+    professional = models.ForeignKey(professional, on_delete=models.CASCADE, null=True)
+    acc_id = models.CharField(max_length=30, null=True, unique=True)
+
 class Follower(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='following')
     professional = models.ForeignKey(professional, on_delete=models.CASCADE, related_name='followers')
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
 class professional_information(models.Model):
     professional = models.OneToOneField(professional,on_delete=models.CASCADE)
     choices=[

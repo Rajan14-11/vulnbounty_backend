@@ -36,6 +36,9 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Count
 from collections import defaultdict
 import stripe
+import http.client
+import json
+import requests
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
 # Create your views here.
@@ -72,6 +75,43 @@ def calculateStreakforUser(user):
         streaks[submission_month] = max(streaks[submission_month], current_streak)
 
      return streaks
+
+def calculate_streak_points(streak):
+    if streak >= 3:
+        return 5
+    elif streak >= 6:
+        return 10
+    elif streak >= 9:
+        return 15
+    elif streak >= 12:
+        return 50
+    else:
+        return 0
+
+def calculate_points():
+    submissions = submission.objects.filter(status='completed').values(
+        'user').annotate(total_points=Count('id'))
+    streak_points = {}
+    print(submissions)
+    points = {}
+    for sub in submissions:
+        user_id = sub['user']
+        profe_user = professional.objects.get(
+            professional_user=user_id)
+        streaks = calculateStreakforUser(profe_user)
+        streak = 0
+        for month, value in streaks.items():
+
+            if value == 0:
+                streak = 0
+            else:
+                streak += 1
+
+        streak_points[user_id] = streak
+        streak = streak_points.get(user_id, 0)
+        points[user_id] = sub['total_points'] * \
+            10 + calculate_streak_points(streak)
+    return points
 
 
 BADGES = {
@@ -171,7 +211,24 @@ class ProfessionalDashboardAPIView(APIView):
                 reward__gte=1
             ).order_by('-reward')[:5]
 
-            leaderboard_data = ProfessionalDashbordserializer(leaderboard, many=True).data
+            # leaderboard_data = ProfessionalDashbordserializer(leaderboard, many=True).data
+
+            total_points = calculate_points()
+            sorted_rankings = sorted(
+                total_points.items(), key=lambda x: x[1], reverse=True)
+
+
+
+            leaderboard_data = []
+            for user_id, total_points in sorted_rankings:
+                professional_data = professional.objects.get(
+                    professional_user=user_id)
+                serializer = ProfessionalDashbordserializer(professional_data)
+                leaderboard_data.append({
+                    'user_id': user_id,
+                    'total_points': total_points,
+                    'professional': serializer.data
+                })
 
             payment_today = payments.objects.filter(
                 transfer_to=request.user.id,
@@ -226,12 +283,19 @@ class ProfessionalProgramAPIView(APIView):
             # (Q(region= 'all')),
             expiry_date__gte=timezone.now().date()
         )
+        scopeData = []
+        for id in data:
+            pid = id.id
+            scopeProgram = ScopeEntry.objects.filter(program_id=id)
+            if scopeProgram.__len__() >=1:
+                scopeData.append(id)
 
         # Fetch invited programs
         invited_program = private_invitation.objects.filter(hunter=professional_obj.id)
 
         # Serialize both company programs and invited programs
-        company_programs_data = CompanyProgramSerializer(data, many=True).data
+        company_programs_data = CompanyProgramSerializer(scopeData, many=True).data
+
         invited_program_data = PrivateInvitationSerializer(invited_program, many=True).data
 
         # Create the response
@@ -462,41 +526,6 @@ class ProfessionalSubmissionDetailsAPIView(APIView):
         return Response(response)
 
 
-def calculate_streak_points(streak):
-    if streak >= 3:
-        return 5
-    elif streak >= 6:
-        return 10
-    elif streak >= 9:
-        return 15
-    elif streak >= 12:
-        return 50
-    else:
-        return 0
-
-def calculate_points():
-    submissions = submission.objects.filter(status='accepted').values(
-        'user').annotate(total_points=Count('id'))
-    streak_points = {}
-
-    points = {}
-    for sub in submissions:
-        user_id = sub['user']
-        profe_user = professional.objects.get(
-            professional_user=user_id)
-        streaks = calculateStreakforUser(profe_user)
-        streak = 0
-        for month, value in streaks.items():
-
-            if value == 0:
-                streak = 0
-            else:
-                streak += 1
-
-        streak_points[user_id] = streak
-        streak = streak_points.get(user_id, 0)
-        points[user_id] = sub['total_points']*10 + calculate_streak_points(streak)
-    return points
 
 class ProfessionalLearderAPIView(APIView):
     renderer_classes = [UserRender]
@@ -1074,28 +1103,6 @@ class ProfessionalSettingsUploadPictureAPIView(APIView):
             return Response(message)
 
 
-            # data = professional.objects.get(professional_user=request.user.id)
-            # try:
-            #     profile_image=request.data['profile_image']
-            #     _format, _dataurl =profile_image.split(';base64,')
-            #     _filename, _extension   = secrets.token_hex(20), _format.split('/')[-1]
-            #     try:
-            #         file = ContentFile( base64.b64decode(_dataurl), name=f"{_filename}.{_extension}")
-            #         if data.profile_picture == 'Null':
-            #             data.profile_picture=file
-            #             data.save()
-            #         else:
-            #             file_exists=os.path.exists(data.profile_picture.path)
-            #             if file_exists == True:
-            #                 os.remove(data.profile_picture.path)
-            #             data.profile_picture=file
-            #             data.save()
-            #         message="Image successfully added"
-            #     except:
-            #         message="Image not added , please retry later"
-            #     return Response({"message":message})
-            # except:
-
 class ProfessionalSettingsUploadResumeAPIView(APIView):
     renderer_classes=[UserRender]
     permission_classes=[IsAuthenticated]
@@ -1123,11 +1130,24 @@ class ProfessionalFavouriteListAPIView(APIView):
     def get(self,request):
         try:
             professional_data=professional.objects.get(professional_user=request.user.id)
-            professional_favourite_program_data=professional_favourite_program.objects.filter(professional=professional_data.id)
-            serializer=ProfessionalFavouriteProgramSerializer(professional_favourite_program_data,many=True).data
+            professional_favourite_program_data = professional_favourite_program.objects.filter(professional=professional_data.id
+            )
+            data=[]
+            for prog in professional_favourite_program_data:
+
+                date = timezone.now().date()
+                if prog.program_id.expiry_date > date :
+
+                    data.append(prog)
+
+
+
+            
+            serializer=ProfessionalFavouriteProgramSerializer(data,many=True).data
 
             message="Success"
-        except:
+        except Exception as e:
+            print(e)
             message="Failed"
             serializer=None
 
@@ -1521,8 +1541,8 @@ class WithdrawMoneyFromWalletView(APIView):
                 bank_account_number = request.user.professional_user.bank_details.first().account_number
                 payout = stripe.Payout.create(
                     amount=int(amount * 100),  # Amount in cents
-                    currency="usd",  # Change to the appropriate currency
-                    destination=bank_account_number,
+                    currency="inr",  # Change to the appropriate currency
+                    destination='acct_1PAVYYSJzdRLxecL',
                 )
 
                 # Check the status of the payout
@@ -1555,10 +1575,10 @@ class WalletBalanceView(APIView):
 
     def get(self, request, *args, **kwargs):
         prof_wallet = professional_wallet.objects.get(professional = request.user.professional_user)
-        prof_wallet_history = professional_wallet_history.objects.get(professional=request.user.professional_user)
+        prof_wallet_history = professional_wallet_history.objects.filter(professional=request.user.professional_user)
         if professional_wallet:
             wallet = ProfessionalWalletSerializer(prof_wallet).data
-            walletHistory = ProfessionalWalletHistorySerializer(prof_wallet_history).data
+            walletHistory = ProfessionalWalletHistorySerializer(prof_wallet_history,many=True).data
             response = {
                 "data":{
                     "wallet":wallet,
@@ -1607,23 +1627,6 @@ class UserSelectionUpdateView(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
-class StreakAPIView(APIView):
-    def get(self, request, *args, **kwargs):
-        # Retrieve the current user's streak without updating it
-        instance, created = Streak.objects.get_or_create(user=request.user)
-
-        serializer = StreakSerializer(instance)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    def post(self, request, *args, **kwargs):
-        # Update the streak when a POST request is received
-        instance, created = Streak.objects.get_or_create(user=request.user)
-        instance.update_streak()
-        serializer = StreakSerializer(instance)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-
 class CustomScopeEntryListCreateView(APIView):
     serializer_class = ScopeEntrySerializer
 
@@ -1656,3 +1659,146 @@ class CompanyProgramDetailsAPIViewinProfessional(APIView):
             }
 
         return Response(response)
+
+class StripeConnectCreateAccountSessionView(APIView):
+    def post(self,request):
+        try:
+            connected_account_id = request.data.get('account')
+
+            account_link = stripe.AccountLink.create(
+          account=connected_account_id,
+          return_url=f"http://localhost:3000/dashboard",
+          refresh_url=f"http://localhost:3000/payment",
+          type="account_onboarding",
+        )
+
+            return Response({
+            'url': account_link.url,
+            })
+        except Exception as e:
+            print('An error occurred when calling the Stripe API to create an account session: ', e)
+            return Response({'error':str(e)})
+
+class StripeAccUpdate(APIView):
+
+    def post(self,request,pk):
+        profe_user = professional.objects.get(
+            professional_user=request.user)
+        professional_login_details_obj = professional_login_details.objects.get(
+            professional=profe_user)
+        account = stripe.Account.modify(pk,
+
+            business_profile={
+                'support_email': profe_user.professional_user.email
+            },
+            settings={
+                "branding":{
+                    'primary_color':'#cc00ff',
+                    'secondary_color':'#ccffff',
+                }
+
+        })
+
+        return Response({'account':account})
+
+
+class CreateAccount(APIView):
+    def post(self, request):
+        contact_url = 'https://api.razorpay.com/v1/contacts'
+        fund_url = 'https://api.razorpay.com/v1/payouts'
+
+        professional_obj = professional.objects.get(
+            professional_user=request.user)
+        amount = int((request.data.get('amount')))
+
+        data = {
+            "account_number": '2323230029804267',
+            "amount": amount*100,
+            "currency": "INR",
+            "mode": "NEFT",
+            "purpose": "refund",
+            "fund_account": {
+                "account_type": "bank_account",
+                "bank_account": {
+                    "name": request.data.get('name'),
+                    "ifsc": request.data.get('IFSC_code'),
+                    "account_number": request.data.get('account_number')
+                },
+                "contact": {
+                    "name": professional_obj.professional_user.first_name + professional_obj.professional_user.last_name,
+                    "email": professional_obj.professional_user.email,
+                    "type": "self",
+                    "reference_id": str(professional_obj.professional_user.id),
+                    "notes": {
+                        "company_username": professional_obj.professional_user.username,
+                    }
+                }
+            },
+            "queue_if_low_balance": True,
+            "reference_id": str(professional_obj.professional_user.id),
+            "narration": "Withdraw from VulnBounty",
+            "notes": {
+                "company_username": professional_obj.professional_user.username,
+            }
+        }
+
+        response = requests.post(fund_url, auth=(
+            settings.RAZORPAY_KEY_ID,
+            settings.RAZORPAY_KEY_SECRET
+        ), json=data)
+
+        if (response.status_code == 200):
+            fundAccObj = response.json().get('fund_account')
+            contactsObj = fundAccObj.get('contact')
+            acc_id = contactsObj.get('id')
+
+            details = professional_razorpay_account.objects.filter(
+                professional=professional_obj)
+            if not details:
+                print('inside')
+                professional_razorpay_account.objects.create(
+                    professional=professional_obj, acc_id=acc_id)
+
+            wallet = professional_wallet.objects.filter(professional=professional_obj.id)
+            walletobj = wallet.get()
+
+            amount = walletobj.amount - float(request.data.get('amount'))
+            wallet.update(
+                amount=amount
+            )
+            professional_wallet_history.objects.create(professional=professional_obj,
+                                                  amount=float(
+                                                      request.data.get('amount')),
+                                                  description='Withdraw from wallet',
+                                                  status='db')
+
+            return Response({'message': "Money will be added to bank account in sometime.", 'data': response.json()}, status=200)
+
+        else:
+
+            return Response({'message': 'Failed', 'data': response.text}, status=500)
+
+
+class FundAccounts(APIView):
+    def get(self, request):
+        url = 'https://api.razorpay.com/v1/fund_accounts'
+        professional_obj = professional.objects.get(
+            professional_user=request.user)
+        razorpay_obj = professional_razorpay_account.objects.filter(
+            professional=professional_obj).get()
+        acc_id = razorpay_obj.acc_id
+        print(acc_id)
+
+        response = requests.get(url, auth=(
+            settings.RAZORPAY_KEY_ID,
+            settings.RAZORPAY_KEY_SECRET
+        ))
+
+        items = response.json().get('items')
+
+        accounts = []
+        for acc in items:
+            if acc_id in acc['contact_id']:
+                accounts.append(acc)
+
+        return Response({'data': accounts})
