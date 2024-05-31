@@ -223,29 +223,32 @@ def calculate_streak_points(streak):
         return 0
 
 
-def calculate_points():
-    submissions = submission.objects.filter(status='completed').values(
+def calculate_points(company_id):
+    submissions = submission.objects.filter( program_id__company=company_id, status='completed').values(
         'user').annotate(total_points=Count('id'))
     streak_points = {}
 
     points = {}
     for sub in submissions:
         user_id = sub['user']
-        profe_user = professional.objects.get(
-            professional_user=user_id)
-        streaks = calculateStreakforUser(profe_user)
-        streak = 0
-        for month, value in streaks.items():
+        try:
+            profe_user = professional.objects.get(
+                professional_user=user_id)
+            streaks = calculateStreakforUser(profe_user)
+            streak = 0
+            for month, value in streaks.items():
+                if value == 0:
+                    streak = 0
+                else:
+                    streak += 1
 
-            if value == 0:
-                streak = 0
-            else:
-                streak += 1
+            streak_points[user_id] = streak
+            streak = streak_points.get(user_id, 0)
+            points[user_id] = sub['total_points'] * \
+                10 + calculate_streak_points(streak)
+        except professional.DoesNotExist:
+            continue
 
-        streak_points[user_id] = streak
-        streak = streak_points.get(user_id, 0)
-        points[user_id] = sub['total_points'] * \
-            10 + calculate_streak_points(streak)
     return points
 
 class CompanyRegisterAPIView(APIView):
@@ -299,7 +302,7 @@ class CompanyDashboardAPIView(APIView):
         payment_this_month = payments.objects.filter(
             transfer_from=company_obj.id, created_at__month=date.today().month).aggregate(Sum('amount'))
 
-        total_points = calculate_points()
+        total_points = calculate_points(request.user)
         sorted_rankings = sorted(
                 total_points.items(), key=lambda x: x[1], reverse=True)
 
@@ -538,7 +541,7 @@ class CompanySubmissionAPIView(APIView):
         for sub in all_submission:
             profe_user = professional.objects.get(
                 professional_user=sub.user.id)
-            print(profe_user.profile_picture)
+
         # pending_submission=submission.objects.filter(program_id__company=request.user,status='pending')
         # accepted_submission=submission.objects.filter(program_id__company=request.user,status='accepted')
         # rejected_submission=submission.objects.filter(program_id__company=request.user,status='rejected')
@@ -681,7 +684,7 @@ class CompanyLeaderBoardAPIView(APIView):
     def get(self, request):
         try:
 
-            total_points = calculate_points()
+            total_points = calculate_points(request.user)
             sorted_rankings = sorted(
                 total_points.items(), key=lambda x: x[1], reverse=True)
             message = "Success"

@@ -117,7 +117,7 @@ class submission(models.Model):
         ('Critical','Critical'),
     ]
     severity = models.CharField(max_length=10,choices=choices,null=True)
-    report = models.FileField(upload_to='document/report',validators=[FileExtensionValidator(['pdf'])])
+    report = models.FileField(upload_to='document/report',validators=[FileExtensionValidator(['pdf','docx'])])
     description= models.CharField(max_length=199,null=True)
     impact = models.CharField(max_length=100,null=True)
     asset = models.CharField(max_length=100,null=True)
